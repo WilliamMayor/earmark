@@ -9,23 +9,12 @@ load_dotenv()
 
 @dataclass(frozen=True)
 class Config:
-    app_id: str
-    private_key: str  # PEM string
-    base_url: str
-    redirect_url: str
+    api_key: str
     db_path: Path
 
 
 def load_config() -> Config:
-    app_id = os.environ["ENABLE_BANKING_APP_ID"]
-
-    key_path = os.environ.get("ENABLE_BANKING_PRIVATE_KEY_PATH", "private_key.pem")
-    private_key = Path(key_path).read_text()
-
     return Config(
-        app_id=app_id,
-        private_key=private_key,
-        base_url=os.environ.get("ENABLE_BANKING_BASE_URL", "https://api.enablebanking.com"),
-        redirect_url=os.environ.get("ENABLE_BANKING_REDIRECT_URL", "https://example.com/callback"),
+        api_key=os.environ["LUNCHFLOW_API_KEY"],
         db_path=Path(os.environ.get("DB_PATH", "transactions.db")),
     )
