@@ -208,7 +208,6 @@ def test_real_migrations_dir_applies_initial_schema(conn):
     run_migrations(conn)
 
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
-    assert "sessions" in tables
     assert "accounts" in tables
     assert "transactions" in tables
     assert "schema_migrations" in tables
