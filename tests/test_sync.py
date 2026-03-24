@@ -1,10 +1,8 @@
 """Tests for sync/sync.py — sync orchestration."""
 
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 from unittest.mock import MagicMock
-
-import pytest
 
 from sync.db import get_all_accounts, get_transactions_for_account, insert_transaction
 from sync.models import Transaction, TransactionStatus
