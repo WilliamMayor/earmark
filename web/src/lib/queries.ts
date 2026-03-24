@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import { getDb, withRetry } from './db.js';
-import { sumAmounts, amountsMatch, toMinorUnits } from './format.js';
+import { sumAmounts, amountsMatch, toMinorUnits, fromMinorUnits } from './format.js';
 import {
 	AlreadyAllocatedError,
 	EnvelopeHasAllocationsError,
@@ -11,6 +11,8 @@ import {
 	type SplitWithStatus,
 	type Transaction
 } from './types.js';
+
+export const ROUND_UP_ENVELOPE_NAME = 'Round Up';
 
 // ---------------------------------------------------------------------------
 // Accounts
@@ -25,10 +27,11 @@ export function getAccounts(db: Database.Database = getDb()): AccountWithStats[]
 			COUNT(CASE
 				WHEN t.credit_debit_indicator = 'DBIT'
 				AND  t.status IN ('booked', 'pending')
-				AND  EXISTS (SELECT 1 FROM splits s WHERE s.transaction_id = t.id)
+				AND  EXISTS (SELECT 1 FROM splits s WHERE s.transaction_id = t.id AND s.is_round_up = 0)
 				AND  NOT EXISTS (
 					SELECT 1 FROM splits s2
 					WHERE s2.transaction_id = t.id
+					AND s2.is_round_up = 0
 					AND NOT EXISTS (SELECT 1 FROM allocations al WHERE al.split_id = s2.id)
 				)
 				THEN NULL
@@ -58,10 +61,11 @@ export function getAccount(
 			COUNT(CASE
 				WHEN t.credit_debit_indicator = 'DBIT'
 				AND  t.status IN ('booked', 'pending')
-				AND  EXISTS (SELECT 1 FROM splits s WHERE s.transaction_id = t.id)
+				AND  EXISTS (SELECT 1 FROM splits s WHERE s.transaction_id = t.id AND s.is_round_up = 0)
 				AND  NOT EXISTS (
 					SELECT 1 FROM splits s2
 					WHERE s2.transaction_id = t.id
+					AND s2.is_round_up = 0
 					AND NOT EXISTS (SELECT 1 FROM allocations al WHERE al.split_id = s2.id)
 				)
 				THEN NULL
@@ -141,6 +145,24 @@ export function createEnvelope(
 	return result.lastInsertRowid as number;
 }
 
+/**
+ * Returns the id of the "Round Up" envelope for the account, creating it if needed.
+ */
+export function getOrCreateRoundUpEnvelope(
+	accountId: number,
+	db: Database.Database = getDb()
+): number {
+	const existing = db
+		.prepare(`SELECT id FROM envelopes WHERE account_id = ? AND name = ?`)
+		.get(accountId, ROUND_UP_ENVELOPE_NAME) as { id: number } | null;
+	if (existing) return existing.id;
+
+	const result = db
+		.prepare(`INSERT INTO envelopes (account_id, name) VALUES (?, ?)`)
+		.run(accountId, ROUND_UP_ENVELOPE_NAME);
+	return result.lastInsertRowid as number;
+}
+
 export function renameEnvelope(
 	envelopeId: number,
 	name: string,
@@ -175,7 +197,7 @@ export function ensureDefaultSplit(
 	withRetry(() =>
 		db.transaction(() => {
 			const existing = db
-				.prepare(`SELECT COUNT(*) AS cnt FROM splits WHERE transaction_id = ?`)
+				.prepare(`SELECT COUNT(*) AS cnt FROM splits WHERE transaction_id = ? AND is_round_up = 0`)
 				.get(transactionId) as { cnt: number };
 			if (existing.cnt > 0) return;
 
@@ -189,6 +211,90 @@ export function ensureDefaultSplit(
 			).run(transactionId, tx.amount);
 		})()
 	);
+	ensureRoundUpSplit(transactionId, db);
+}
+
+/**
+ * If the transaction's account has round_up enabled and the transaction is a DBIT
+ * with a non-whole amount, ensures an is_round_up split exists and is allocated to
+ * the "Round Up" envelope. Idempotent — safe to call multiple times.
+ */
+export function ensureRoundUpSplit(
+	transactionId: number,
+	db: Database.Database = getDb()
+): void {
+	const row = db
+		.prepare(
+			`SELECT t.amount, t.credit_debit_indicator, t.account_id, a.round_up
+			 FROM transactions t
+			 JOIN accounts a ON a.id = t.account_id
+			 WHERE t.id = ?`
+		)
+		.get(transactionId) as {
+		amount: string;
+		credit_debit_indicator: string;
+		account_id: number;
+		round_up: number;
+	} | null;
+
+	if (!row) return;
+	if (!row.round_up || row.credit_debit_indicator !== 'DBIT') return;
+
+	const minorUnits = toMinorUnits(row.amount);
+	const roundedUp = Math.ceil(minorUnits / 100) * 100;
+	const roundUpMinorUnits = roundedUp - minorUnits;
+
+	// Nothing to round up — amount is already a whole number.
+	if (roundUpMinorUnits === 0) return;
+
+	withRetry(() =>
+		db.transaction(() => {
+			// Already has a round-up split — nothing to do.
+			const existing = db
+				.prepare(`SELECT id FROM splits WHERE transaction_id = ? AND is_round_up = 1`)
+				.get(transactionId);
+			if (existing) return;
+
+			const roundUpAmount = fromMinorUnits(roundUpMinorUnits);
+			const result = db
+				.prepare(
+					`INSERT INTO splits (transaction_id, amount, sort_order, is_round_up) VALUES (?, ?, 999, 1)`
+				)
+				.run(transactionId, roundUpAmount);
+			const splitId = result.lastInsertRowid as number;
+
+			const envelopeId = getOrCreateRoundUpEnvelope(row.account_id, db);
+			db.prepare(`INSERT INTO allocations (envelope_id, split_id) VALUES (?, ?)`)
+				.run(envelopeId, splitId);
+		})()
+	);
+}
+
+/**
+ * Enable or disable the round-up feature on an account.
+ * When enabling, ensures a "Round Up" envelope exists and back-fills round-up
+ * splits for any currently unallocated DBIT transactions.
+ */
+export function setAccountRoundUp(
+	accountId: number,
+	enabled: boolean,
+	db: Database.Database = getDb()
+): void {
+	db.prepare(`UPDATE accounts SET round_up = ? WHERE id = ?`).run(enabled ? 1 : 0, accountId);
+
+	if (enabled) {
+		getOrCreateRoundUpEnvelope(accountId, db);
+		// Back-fill round-up splits for existing unallocated transactions.
+		const txs = db
+			.prepare(
+				`SELECT id FROM transactions
+				 WHERE account_id = ? AND credit_debit_indicator = 'DBIT' AND status IN ('booked', 'pending')`
+			)
+			.all(accountId) as Array<{ id: number }>;
+		for (const tx of txs) {
+			ensureRoundUpSplit(tx.id, db);
+		}
+	}
 }
 
 export function getSplitsWithStatus(
@@ -206,7 +312,7 @@ export function getSplitsWithStatus(
 		FROM splits s
 		LEFT JOIN allocations al ON al.split_id = s.id
 		LEFT JOIN envelopes e ON e.id = al.envelope_id
-		WHERE s.transaction_id = ?
+		WHERE s.transaction_id = ? AND s.is_round_up = 0
 		ORDER BY s.sort_order
 	`
 		)
@@ -214,6 +320,7 @@ export function getSplitsWithStatus(
 		.map((row: Record<string, unknown>) => ({
 			...(row as Split),
 			is_allocated: (row.is_allocated as number) === 1,
+			is_round_up: false,
 			envelope_id: (row.envelope_id as number | null) ?? null,
 			envelope_name: (row.envelope_name as string | null) ?? null
 		})) as SplitWithStatus[];
@@ -249,7 +356,7 @@ export function saveSplits(
 
 	withRetry(() =>
 		db.transaction(() => {
-			db.prepare(`DELETE FROM splits WHERE transaction_id = ?`).run(transactionId);
+			db.prepare(`DELETE FROM splits WHERE transaction_id = ? AND is_round_up = 0`).run(transactionId);
 			const insert = db.prepare(
 				`INSERT INTO splits (transaction_id, amount, note, sort_order) VALUES (?, ?, ?, ?)`
 			);
@@ -258,6 +365,7 @@ export function saveSplits(
 			});
 		})()
 	);
+	ensureRoundUpSplit(transactionId, db);
 }
 
 /**
@@ -270,7 +378,7 @@ export function resetSplits(
 ): void {
 	withRetry(() =>
 		db.transaction(() => {
-			db.prepare(`DELETE FROM splits WHERE transaction_id = ?`).run(transactionId);
+			db.prepare(`DELETE FROM splits WHERE transaction_id = ? AND is_round_up = 0`).run(transactionId);
 		})()
 	);
 	ensureDefaultSplit(transactionId, db);
@@ -317,10 +425,11 @@ export function getUnallocatedTransactions(
 		  AND t.credit_debit_indicator = 'DBIT'
 		  AND t.status IN ('booked', 'pending')
 		  AND NOT (
-		      EXISTS (SELECT 1 FROM splits s WHERE s.transaction_id = t.id)
+		      EXISTS (SELECT 1 FROM splits s WHERE s.transaction_id = t.id AND s.is_round_up = 0)
 		      AND NOT EXISTS (
 		          SELECT 1 FROM splits s2
 		          WHERE s2.transaction_id = t.id
+		          AND s2.is_round_up = 0
 		          AND NOT EXISTS (SELECT 1 FROM allocations al WHERE al.split_id = s2.id)
 		      )
 		  )

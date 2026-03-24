@@ -65,6 +65,32 @@
 		</div>
 	</header>
 
+	<!-- Round-up toggle -->
+	<div class="bg-white border-b border-gray-200 px-4 py-3 max-w-lg mx-auto w-full">
+		<form method="POST" action="?/toggle_round_up" use:enhance class="flex items-center justify-between gap-3">
+			<div>
+				<p class="text-sm font-medium text-gray-900">Round Up</p>
+				<p class="text-xs text-gray-500">Save the spare change from every transaction</p>
+			</div>
+			<input type="hidden" name="enabled" value={account.round_up ? '0' : '1'} />
+			<button
+				type="submit"
+				class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+				class:bg-indigo-600={account.round_up}
+				class:bg-gray-200={!account.round_up}
+				role="switch"
+				aria-checked={account.round_up}
+				aria-label="Toggle round up"
+			>
+				<span
+					class="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition duration-200"
+					class:translate-x-5={account.round_up}
+					class:translate-x-0={!account.round_up}
+				></span>
+			</button>
+		</form>
+	</div>
+
 	<!-- Envelope list (scrollable, leaves room for dock) -->
 	<main class="flex-1 overflow-y-auto p-4 space-y-3 max-w-lg mx-auto w-full"
 		class:pb-48={data.mode === 'allocate'}>

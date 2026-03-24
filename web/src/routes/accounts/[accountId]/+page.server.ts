@@ -6,7 +6,8 @@ import {
 	renameEnvelope,
 	deleteEnvelope,
 	allocateSplit,
-	getSplitsWithStatus
+	getSplitsWithStatus,
+	setAccountRoundUp
 } from '$lib/queries.js';
 import { AlreadyAllocatedError, EnvelopeHasAllocationsError } from '$lib/types.js';
 
@@ -101,6 +102,14 @@ export const actions = {
 			throw err;
 		}
 
+		redirect(303, `/accounts/${accountId}`);
+	},
+
+	toggle_round_up: async ({ request, params }) => {
+		const accountId = parseInt(params.accountId, 10);
+		const data = await request.formData();
+		const enabled = data.get('enabled') === '1';
+		setAccountRoundUp(accountId, enabled);
 		redirect(303, `/accounts/${accountId}`);
 	}
 };
