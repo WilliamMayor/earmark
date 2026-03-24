@@ -184,6 +184,14 @@ def update_transaction_status(
     conn.commit()
 
 
+def has_opening_balance(conn: sqlite3.Connection, account_id: int) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM transactions WHERE account_id = ? AND status = ? LIMIT 1",
+        (account_id, TransactionStatus.OPENING_BALANCE.value),
+    ).fetchone()
+    return row is not None
+
+
 def get_transactions_for_account(
     conn: sqlite3.Connection,
     account_id: int,

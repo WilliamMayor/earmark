@@ -80,6 +80,18 @@ def test_no_adjustor_when_no_transactions(db_conn, saved_account):
     assert txns == []
 
 
+def test_adjustor_not_duplicated_on_second_sync(db_conn, saved_account):
+    tx = _make_api_tx(saved_account.id, date(2025, 6, 1), amount=Decimal("10.00"), cdi="DBIT")
+    client = _make_client([tx], balance=Decimal("90.00"))
+
+    sync_account(db_conn, client, saved_account)
+    sync_account(db_conn, client, saved_account)  # second run
+
+    txns = get_transactions_for_account(db_conn, saved_account.id)
+    opening = [t for t in txns if t.status == TransactionStatus.OPENING_BALANCE]
+    assert len(opening) == 1
+
+
 # ---------------------------------------------------------------------------
 # Upsert behaviour
 # ---------------------------------------------------------------------------

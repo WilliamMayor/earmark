@@ -10,8 +10,11 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+import httpx
+
 from .db import (
     get_all_accounts,
+    has_opening_balance,
     insert_transaction,
     update_account_sync_info,
     upsert_transaction,
@@ -33,7 +36,7 @@ def sync_account(conn: sqlite3.Connection, client: object, account: Account) -> 
             (tx.amount if tx.credit_debit_indicator == "CRDT" else -tx.amount)
             for tx in api_transactions
         )
-        if expected_balance != current_balance:
+        if expected_balance != current_balance and not has_opening_balance(conn, account.id):  # type: ignore[arg-type]
             earliest_date = min(
                 (tx.date for tx in api_transactions if tx.date),
                 default=None,
@@ -90,7 +93,7 @@ def sync_all(conn: sqlite3.Connection, client: object) -> list[dict]:
             result = sync_account(conn, client, account)
             results.append(result)
             print(f"  {result['upserted']} transaction(s) synced")
-        except Exception as e:
+        except httpx.HTTPError as e:
             print(f"  Failed: {e}")
             results.append({
                 "lunchflow_id": account.lunchflow_id,
