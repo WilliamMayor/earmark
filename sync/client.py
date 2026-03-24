@@ -55,7 +55,7 @@ class LunchflowClient:
     def __enter__(self) -> LunchflowClient:
         return self
 
-    def __exit__(self, *args: object) -> None:
+    def __exit__(self, *_: object) -> None:
         self.close()
 
 

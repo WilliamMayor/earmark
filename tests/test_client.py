@@ -33,6 +33,7 @@ def test_map_transaction_debit():
         "date": "2025-06-01", "merchant": "Tesco", "description": "groceries", "isPending": False,
     }
     tx = _map_transaction(data)
+    assert tx is not None
     assert tx.lunchflow_id == "tx-1"
     assert tx.credit_debit_indicator == "DBIT"
     assert tx.amount == Decimal("25.50")
@@ -47,6 +48,7 @@ def test_map_transaction_credit():
         "date": "2025-06-15", "merchant": "Employer", "description": "salary", "isPending": False,
     }
     tx = _map_transaction(data)
+    assert tx is not None
     assert tx.credit_debit_indicator == "CRDT"
     assert tx.amount == Decimal("1000.00")
 
@@ -57,6 +59,7 @@ def test_map_transaction_pending():
         "date": "2025-06-10", "merchant": "Coffee", "description": None, "isPending": True,
     }
     tx = _map_transaction(data)
+    assert tx is not None
     assert tx.status == TransactionStatus.PENDING
 
 
