@@ -1,4 +1,5 @@
-import json
+from __future__ import annotations
+
 import sqlite3
 from datetime import date, datetime
 from decimal import Decimal
@@ -23,106 +24,37 @@ def init_schema(conn: sqlite3.Connection) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Sessions
-# ---------------------------------------------------------------------------
-
-def insert_session(conn: sqlite3.Connection, session: Session) -> Session:
-    cursor = conn.execute(
-        """
-        INSERT INTO sessions (session_id, aspsp_name, psu_type, valid_until, created_at, is_active)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        (
-            session.session_id,
-            session.aspsp_name,
-            session.psu_type.value,
-            session.valid_until.isoformat(),
-            session.created_at.isoformat(),
-            int(session.is_active),
-        ),
-    )
-    conn.commit()
-    return Session(
-        id=cursor.lastrowid,
-        session_id=session.session_id,
-        aspsp_name=session.aspsp_name,
-        psu_type=session.psu_type,
-        valid_until=session.valid_until,
-        created_at=session.created_at,
-        is_active=session.is_active,
-    )
-
-
-def get_active_session(conn: sqlite3.Connection, aspsp_name: str) -> Optional[Session]:
-    row = conn.execute(
-        """
-        SELECT * FROM sessions
-        WHERE aspsp_name = ? AND is_active = 1
-        ORDER BY created_at DESC
-        LIMIT 1
-        """,
-        (aspsp_name,),
-    ).fetchone()
-    return _row_to_session(row) if row else None
-
-
-def deactivate_session(conn: sqlite3.Connection, session_id: int) -> None:
-    conn.execute("UPDATE sessions SET is_active = 0 WHERE id = ?", (session_id,))
-    conn.commit()
-
-
-def _row_to_session(row: sqlite3.Row) -> Session:
-    return Session(
-        id=row["id"],
-        session_id=row["session_id"],
-        aspsp_name=row["aspsp_name"],
-        psu_type=PsuType(row["psu_type"]),
-        valid_until=datetime.fromisoformat(row["valid_until"]),
-        created_at=datetime.fromisoformat(row["created_at"]),
-        is_active=bool(row["is_active"]),
-    )
-
-
-# ---------------------------------------------------------------------------
 # Accounts
 # ---------------------------------------------------------------------------
 
 def upsert_account(conn: sqlite3.Connection, account: Account) -> Account:
     existing = conn.execute(
-        "SELECT id FROM accounts WHERE account_uid = ?",
-        (account.account_uid,),
+        "SELECT id FROM accounts WHERE lunchflow_id = ?",
+        (account.lunchflow_id,),
     ).fetchone()
 
     if existing:
         conn.execute(
-            """
-            UPDATE accounts SET session_id = ?, name = ?, currency = ?
-            WHERE account_uid = ?
-            """,
-            (account.session_id, account.name, account.currency, account.account_uid),
+            "UPDATE accounts SET name = ?, institution_name = ?, currency = ? WHERE lunchflow_id = ?",
+            (account.name, account.institution_name, account.currency, account.lunchflow_id),
         )
         conn.commit()
         account_id = existing["id"]
     else:
         cursor = conn.execute(
-            """
-            INSERT INTO accounts (session_id, account_uid, aspsp_name, name, currency)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (account.session_id, account.account_uid, account.aspsp_name, account.name, account.currency),
+            "INSERT INTO accounts (lunchflow_id, name, institution_name, currency) VALUES (?, ?, ?, ?)",
+            (account.lunchflow_id, account.name, account.institution_name, account.currency),
         )
         conn.commit()
         account_id = cursor.lastrowid
 
     return Account(
         id=account_id,
-        session_id=account.session_id,
-        account_uid=account.account_uid,
-        aspsp_name=account.aspsp_name,
+        lunchflow_id=account.lunchflow_id,
         name=account.name,
+        institution_name=account.institution_name,
         currency=account.currency,
         last_synced_at=account.last_synced_at,
-        last_synced_booking_date=account.last_synced_booking_date,
     )
 
 
@@ -131,30 +63,14 @@ def get_all_accounts(conn: sqlite3.Connection) -> list[Account]:
     return [_row_to_account(row) for row in rows]
 
 
-def get_accounts_for_session(conn: sqlite3.Connection, session_id: int) -> list[Account]:
-    rows = conn.execute(
-        "SELECT * FROM accounts WHERE session_id = ?", (session_id,)
-    ).fetchall()
-    return [_row_to_account(row) for row in rows]
-
-
 def update_account_sync_info(
     conn: sqlite3.Connection,
     account_id: int,
     synced_at: datetime,
-    latest_booking_date: Optional[date],
 ) -> None:
     conn.execute(
-        """
-        UPDATE accounts
-        SET last_synced_at = ?, last_synced_booking_date = ?
-        WHERE id = ?
-        """,
-        (
-            synced_at.isoformat(),
-            latest_booking_date.isoformat() if latest_booking_date else None,
-            account_id,
-        ),
+        "UPDATE accounts SET last_synced_at = ? WHERE id = ?",
+        (synced_at.isoformat(), account_id),
     )
     conn.commit()
 
@@ -162,16 +78,12 @@ def update_account_sync_info(
 def _row_to_account(row: sqlite3.Row) -> Account:
     return Account(
         id=row["id"],
-        session_id=row["session_id"],
-        account_uid=row["account_uid"],
-        aspsp_name=row["aspsp_name"],
+        lunchflow_id=row["lunchflow_id"],
         name=row["name"],
+        institution_name=row["institution_name"],
         currency=row["currency"],
-        last_synced_at=datetime.fromisoformat(row["last_synced_at"]) if row["last_synced_at"] else None,
-        last_synced_booking_date=(
-            date.fromisoformat(row["last_synced_booking_date"])
-            if row["last_synced_booking_date"]
-            else None
+        last_synced_at=(
+            datetime.fromisoformat(row["last_synced_at"]) if row["last_synced_at"] else None
         ),
     )
 
@@ -184,42 +96,80 @@ def insert_transaction(conn: sqlite3.Connection, tx: Transaction) -> Transaction
     cursor = conn.execute(
         """
         INSERT INTO transactions (
-            account_id, entry_reference, booking_date, value_date,
-            amount, currency, credit_debit_indicator, status,
-            payee, remittance_information, note, raw_data
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            account_id, lunchflow_id, date, amount, currency,
+            credit_debit_indicator, status, merchant, description, note
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             tx.account_id,
-            tx.entry_reference,
-            tx.booking_date.isoformat() if tx.booking_date else None,
-            tx.value_date.isoformat() if tx.value_date else None,
+            tx.lunchflow_id,
+            tx.date.isoformat() if tx.date else None,
             str(tx.amount),
             tx.currency,
             tx.credit_debit_indicator,
             tx.status.value,
-            tx.payee,
-            json.dumps(tx.remittance_information) if tx.remittance_information else None,
+            tx.merchant,
+            tx.description,
             tx.note,
-            json.dumps(tx.raw_data) if tx.raw_data else None,
         ),
     )
     conn.commit()
     return Transaction(
         id=cursor.lastrowid,
         account_id=tx.account_id,
-        entry_reference=tx.entry_reference,
-        booking_date=tx.booking_date,
-        value_date=tx.value_date,
+        lunchflow_id=tx.lunchflow_id,
+        date=tx.date,
         amount=tx.amount,
         currency=tx.currency,
         credit_debit_indicator=tx.credit_debit_indicator,
         status=tx.status,
-        payee=tx.payee,
-        remittance_information=tx.remittance_information,
+        merchant=tx.merchant,
+        description=tx.description,
         note=tx.note,
-        raw_data=tx.raw_data,
     )
+
+
+def upsert_transaction(conn: sqlite3.Connection, tx: Transaction) -> Transaction:
+    """Insert or update a transaction by lunchflow_id. The note field is never overwritten."""
+    if tx.lunchflow_id is not None:
+        existing = conn.execute(
+            "SELECT id, note FROM transactions WHERE lunchflow_id = ?",
+            (tx.lunchflow_id,),
+        ).fetchone()
+        if existing:
+            conn.execute(
+                """
+                UPDATE transactions SET
+                    date = ?, amount = ?, currency = ?, credit_debit_indicator = ?,
+                    status = ?, merchant = ?, description = ?, updated_at = datetime('now')
+                WHERE lunchflow_id = ?
+                """,
+                (
+                    tx.date.isoformat() if tx.date else None,
+                    str(tx.amount),
+                    tx.currency,
+                    tx.credit_debit_indicator,
+                    tx.status.value,
+                    tx.merchant,
+                    tx.description,
+                    tx.lunchflow_id,
+                ),
+            )
+            conn.commit()
+            return Transaction(
+                id=existing["id"],
+                account_id=tx.account_id,
+                lunchflow_id=tx.lunchflow_id,
+                date=tx.date,
+                amount=tx.amount,
+                currency=tx.currency,
+                credit_debit_indicator=tx.credit_debit_indicator,
+                status=tx.status,
+                merchant=tx.merchant,
+                description=tx.description,
+                note=existing["note"],
+            )
+    return insert_transaction(conn, tx)
 
 
 def update_transaction_status(
@@ -244,46 +194,30 @@ def get_transactions_for_account(
     params: list = [account_id]
 
     if date_from:
-        query += " AND (booking_date IS NULL OR booking_date >= ?)"
+        query += " AND (date IS NULL OR date >= ?)"
         params.append(date_from.isoformat())
     if date_to:
-        query += " AND (booking_date IS NULL OR booking_date <= ?)"
+        query += " AND (date IS NULL OR date <= ?)"
         params.append(date_to.isoformat())
 
-    query += " ORDER BY booking_date ASC, id ASC"
+    query += " ORDER BY date ASC, id ASC"
     rows = conn.execute(query, params).fetchall()
     return [_row_to_transaction(row) for row in rows]
-
-
-def get_transaction_by_entry_ref(
-    conn: sqlite3.Connection,
-    account_id: int,
-    entry_reference: str,
-) -> Optional[Transaction]:
-    row = conn.execute(
-        "SELECT * FROM transactions WHERE account_id = ? AND entry_reference = ?",
-        (account_id, entry_reference),
-    ).fetchone()
-    return _row_to_transaction(row) if row else None
 
 
 def _row_to_transaction(row: sqlite3.Row) -> Transaction:
     return Transaction(
         id=row["id"],
         account_id=row["account_id"],
-        entry_reference=row["entry_reference"],
-        booking_date=date.fromisoformat(row["booking_date"]) if row["booking_date"] else None,
-        value_date=date.fromisoformat(row["value_date"]) if row["value_date"] else None,
+        lunchflow_id=row["lunchflow_id"],
+        date=date.fromisoformat(row["date"]) if row["date"] else None,
         amount=Decimal(row["amount"]),
         currency=row["currency"],
         credit_debit_indicator=row["credit_debit_indicator"],
         status=TransactionStatus(row["status"]),
-        payee=row["payee"],
-        remittance_information=(
-            json.loads(row["remittance_information"]) if row["remittance_information"] else None
-        ),
+        merchant=row["merchant"],
+        description=row["description"],
         note=row["note"],
-        raw_data=json.loads(row["raw_data"]) if row["raw_data"] else None,
         created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
         updated_at=datetime.fromisoformat(row["updated_at"]) if row["updated_at"] else None,
     )
