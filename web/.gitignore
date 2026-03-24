@@ -1,0 +1,7 @@
+.svelte-kit/
+build/
+node_modules/
+.env
+tests/fixture.db
+playwright-report/
+test-results/
