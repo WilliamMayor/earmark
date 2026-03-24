@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Budget Tool — Envelope Budgeting Wireframes</title>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #f0eeeb;
+      font-family: 'Caveat', cursive, sans-serif;
+      color: #222;
+      padding: 2rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    header p {
+      font-size: 1.1rem;
+      color: #666;
+      margin-top: 4px;
+      font-family: sans-serif;
+    }
+
+    .wireframe-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2.5rem;
+      justify-content: center;
+    }
+
+    .frame-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .phone-frame {
+      width: 375px;
+      height: 812px;
+      border: 3px solid #333;
+      border-radius: 40px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: 6px 6px 0 #bbb;
+      position: relative;
+    }
+
+    .screen-label {
+      margin-top: 12px;
+      font-size: 0.85rem;
+      color: #555;
+      font-family: sans-serif;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    /* ─── Screen internals ─── */
+    .screen {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      font-family: 'Caveat', cursive, sans-serif;
+      font-size: 16px;
+      color: #222;
+    }
+
+    .wf-statusbar {
+      height: 28px;
+      background: #f0f0f0;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 20px;
+      font-size: 12px;
+      font-family: sans-serif;
+      color: #555;
+      flex-shrink: 0;
+    }
+
+    .wf-header {
+      background: #fafafa;
+      border-bottom: 2px solid #ddd;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .wf-header-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      flex: 1;
+    }
+
+    .wf-back {
+      font-size: 1rem;
+      color: #555;
+      border: none;
+      background: none;
+      cursor: default;
+    }
+
+    .wf-icon-btn {
+      width: 28px;
+      height: 28px;
+      border: 2px solid #aaa;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: #777;
+      flex-shrink: 0;
+    }
+
+    /* ─── Scrollable body ─── */
+    .scrollable {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+    }
+
+    /* ─── Dock ─── */
+    .wf-dock {
+      flex-shrink: 0;
+      border-top: 3px dashed #555;
+      padding: 12px 16px;
+      background: #fff;
+    }
+
+    .wf-dock.skipped {
+      background: #fffbef;
+      border-top-color: #c8a400;
+    }
+
+    /* ─── Components ─── */
+    .wf-section-label {
+      font-size: 12px;
+      font-family: sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #999;
+      margin: 10px 0 6px;
+    }
+
+    .wf-box {
+      border: 2px solid #bbb;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin: 6px 0;
+      background: #fafafa;
+    }
+
+    .wf-box.shaded {
+      background: #f2f2f2;
+    }
+
+    .wf-box.dashed-amber {
+      border: 2px dashed #c8a400;
+      background: #fffbef;
+    }
+
+    .wf-card {
+      border: 2px solid #333;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin: 6px 0;
+      background: #fff;
+      box-shadow: 2px 2px 0 #ccc;
+    }
+
+    .wf-badge {
+      display: inline-block;
+      background: #333;
+      color: #fff;
+      border-radius: 12px;
+      padding: 2px 8px;
+      font-size: 13px;
+      font-family: sans-serif;
+    }
+
+    .wf-badge.amber {
+      background: #c8a400;
+    }
+
+    .wf-button {
+      display: inline-block;
+      border: 2px solid #444;
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 15px;
+      font-family: 'Caveat', cursive, sans-serif;
+      background: #eee;
+      color: #333;
+      cursor: default;
+    }
+
+    .wf-button.primary {
+      background: #333;
+      color: #fff;
+    }
+
+    .wf-button.amber {
+      border-color: #c8a400;
+      background: #fff8dc;
+    }
+
+    .wf-button.small {
+      padding: 3px 10px;
+      font-size: 13px;
+    }
+
+    .wf-divider {
+      border: none;
+      border-top: 1px dashed #ccc;
+      margin: 10px 0;
+    }
+
+    .wf-divider.solid {
+      border-top: 1px solid #ddd;
+    }
+
+    /* ─── Envelope row ─── */
+    .envelope-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .envelope-row:last-child {
+      border-bottom: none;
+    }
+
+    .envelope-name {
+      flex: 1;
+      font-weight: 600;
+      font-size: 16px;
+    }
+
+    .envelope-amount {
+      font-size: 15px;
+      color: #444;
+      white-space: nowrap;
+    }
+
+    .envelope-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .wf-bar-bg {
+      height: 8px;
+      background: #e0e0e0;
+      border-radius: 4px;
+      margin-top: 4px;
+      position: relative;
+    }
+
+    .wf-bar-fill {
+      height: 100%;
+      background: #555;
+      border-radius: 4px;
+    }
+
+    /* ─── Account card ─── */
+    .account-card {
+      border: 2px solid #bbb;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin: 8px 0;
+      background: #fafafa;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 2px 2px 0 #ddd;
+    }
+
+    .account-icon {
+      width: 38px;
+      height: 38px;
+      border: 2px solid #aaa;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      color: #555;
+      flex-shrink: 0;
+    }
+
+    .account-info {
+      flex: 1;
+    }
+
+    .account-name {
+      font-weight: 700;
+      font-size: 17px;
+    }
+
+    .account-meta {
+      font-size: 13px;
+      font-family: sans-serif;
+      color: #999;
+      margin-top: 1px;
+    }
+
+    .account-chevron {
+      font-size: 18px;
+      color: #aaa;
+    }
+
+    /* ─── Skipped banner ─── */
+    .skipped-banner {
+      background: #ffe8b0;
+      border-bottom: 2px dashed #c8a400;
+      padding: 8px 16px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .skipped-banner-text {
+      flex: 1;
+    }
+
+    /* ─── Progress dots ─── */
+    .progress-dots {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #555;
+    }
+
+    .dot.empty {
+      background: transparent;
+      border: 2px solid #aaa;
+    }
+
+    .dot.diamond {
+      width: 8px;
+      height: 8px;
+      border-radius: 1px;
+      transform: rotate(45deg);
+      background: #c8a400;
+    }
+
+    .dot.diamond-empty {
+      width: 8px;
+      height: 8px;
+      border-radius: 1px;
+      transform: rotate(45deg);
+      background: transparent;
+      border: 2px solid #c8a400;
+    }
+
+    /* ─── Input ─── */
+    .wf-input {
+      border: 2px solid #999;
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 16px;
+      font-family: 'Caveat', cursive;
+      width: 100%;
+      background: #fafafa;
+      color: #333;
+    }
+
+    /* ─── Radio row ─── */
+    .radio-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .radio-circle {
+      width: 16px;
+      height: 16px;
+      border: 2px solid #888;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .radio-circle.selected {
+      border-color: #333;
+      background: radial-gradient(circle, #333 5px, transparent 5px);
+    }
+
+    /* ─── Split item ─── */
+    .split-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      margin: 4px 0;
+    }
+
+    .split-remove {
+      font-size: 13px;
+      color: #c00;
+      border: 1px solid #c00;
+      border-radius: 4px;
+      padding: 1px 6px;
+    }
+
+    /* ─── Teaser strip ─── */
+    .teaser-strip {
+      background: #f7f7f0;
+      border: 2px dashed #bbb;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-top: 12px;
+      cursor: default;
+    }
+
+    .teaser-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .teaser-tap {
+      font-size: 13px;
+      color: #999;
+      margin-top: 4px;
+    }
+
+    /* ─── Add-envelope row ─── */
+    .add-envelope {
+      text-align: center;
+      padding: 10px 0;
+      color: #888;
+      font-size: 15px;
+      border: 2px dashed #ccc;
+      border-radius: 8px;
+      margin-top: 8px;
+    }
+
+    /* ─── Util ─── */
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .row.spread {
+      justify-content: space-between;
+    }
+
+    .row.end {
+      justify-content: flex-end;
+    }
+
+    .mt4 { margin-top: 4px; }
+    .mt8 { margin-top: 8px; }
+    .mt12 { margin-top: 12px; }
+
+    .text-sm { font-size: 13px; }
+    .text-xs { font-size: 12px; font-family: sans-serif; }
+    .text-muted { color: #888; }
+    .text-bold { font-weight: 700; }
+    .text-lg { font-size: 19px; font-weight: 700; }
+    .text-amber { color: #a07800; }
+    .text-debit { color: #c00; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Budget Tool — Envelope Budgeting</h1>
+  <p>Wireframes · 5 screens · Mobile-first</p>
+</header>
+
+<div class="wireframe-grid">
+
+  <!-- ══════════════════════════════════
+       SCREEN 1: Account List
+  ══════════════════════════════════ -->
+  <div class="frame-wrapper">
+    <div class="phone-frame">
+      <div class="screen">
+
+        <div class="wf-statusbar">
+          <span>9:41</span>
+          <span>●●●  WiFi  100%</span>
+        </div>
+
+        <div class="wf-header" style="justify-content: center;">
+          <div class="wf-header-title" style="text-align:center;">Budget</div>
+        </div>
+
+        <div class="scrollable">
+
+          <div class="wf-section-label">Your Accounts</div>
+
+          <div class="account-card">
+            <div class="account-icon">M</div>
+            <div class="account-info">
+              <div class="account-name">Monzo Personal</div>
+              <div class="account-meta">GBP · Last synced: today</div>
+            </div>
+            <div class="account-chevron">›</div>
+          </div>
+
+          <div class="account-card">
+            <div class="account-icon">N</div>
+            <div class="account-info">
+              <div class="account-name">Nationwide Current</div>
+              <div class="account-meta">GBP · Last synced: yesterday</div>
+            </div>
+            <div class="account-chevron">›</div>
+          </div>
+
+          <div class="account-card">
+            <div class="account-icon">A</div>
+            <div class="account-info">
+              <div class="account-name">Amex Gold</div>
+              <div class="account-meta">GBP · Last synced: 3 days ago</div>
+            </div>
+            <div class="account-chevron">›</div>
+          </div>
+
+          <hr class="wf-divider" style="margin-top:16px;">
+
+          <div style="text-align:center; padding: 10px 0; color:#888; font-size:15px;">
+            + Add account
+          </div>
+
+        </div>
+      </div>
+    </div>
+    <p class="screen-label">1 — Account List</p>
+  </div>
+
+  <!-- ══════════════════════════════════
+       SCREEN 2: Envelope List (overview, no allocation in progress)
+  ══════════════════════════════════ -->
+  <div class="frame-wrapper">
+    <div class="phone-frame">
+      <div class="screen">
+
+        <div class="wf-statusbar">
+          <span>9:41</span>
+          <span>●●●  WiFi  100%</span>
+        </div>
+
+        <div class="wf-header">
+          <span class="wf-back">‹ Back</span>
+          <div class="wf-header-title">Monzo Personal</div>
+          <div class="wf-icon-btn">⚙</div>
+        </div>
+
+        <div class="scrollable">
+
+          <div class="row spread" style="margin-bottom:4px;">
+            <div class="wf-section-label" style="margin:0;">Envelopes</div>
+            <span class="wf-badge">3 unallocated</span>
+          </div>
+
+          <!-- Envelope rows: widths scaled so Rent=80%, proportional to others -->
+          <!-- Total: £1720. Scale: 80 / (850/1720*100) = 80/49.42 = 1.619 -->
+          <!-- Groceries 320: 30%  Rent 850: 80%  Entertainment 180: 17%  Transport 240: 23%  Eating Out 130: 12% -->
+
+          <div class="envelope-row">
+            <div class="envelope-info">
+              <div class="envelope-name">Groceries</div>
+              <div class="wf-bar-bg"><div class="wf-bar-fill" style="width:30%"></div></div>
+            </div>
+            <div class="envelope-amount">£320.00</div>
+          </div>
+
+          <div class="envelope-row">
+            <div class="envelope-info">
+              <div class="envelope-name">Rent</div>
+              <div class="wf-bar-bg"><div class="wf-bar-fill" style="width:80%"></div></div>
+            </div>
+            <div class="envelope-amount">£850.00</div>
+          </div>
+
+          <div class="envelope-row">
+            <div class="envelope-info">
+              <div class="envelope-name">Entertainment</div>
+              <div class="wf-bar-bg"><div class="wf-bar-fill" style="width:17%"></div></div>
+            </div>
+            <div class="envelope-amount">£180.00</div>
+          </div>
+
+          <div class="envelope-row">
+            <div class="envelope-info">
+              <div class="envelope-name">Transport</div>
+              <div class="wf-bar-bg"><div class="wf-bar-fill" style="width:23%"></div></div>
+            </div>
+            <div class="envelope-amount">£240.00</div>
+          </div>
+
+          <div class="envelope-row">
+            <div class="envelope-info">
+              <div class="envelope-name">Eating Out</div>
+              <div class="wf-bar-bg"><div class="wf-bar-fill" style="width:12%"></div></div>
+            </div>
+            <div class="envelope-amount">£130.00</div>
+          </div>
+
+          <div class="add-envelope">+ New Envelope</div>
+
+          <hr class="wf-divider" style="border-style:solid; margin-top:14px;">
+
+          <div class="wf-section-label">Next Unallocated</div>
+          <div class="teaser-strip">
+            <div class="teaser-row">
+              <span class="text-bold">Tesco Superstore</span>
+              <span class="text-bold text-debit">−£18.50</span>
+            </div>
+            <div class="text-xs text-muted mt4">Debit · 24 Mar 2026</div>
+            <div class="teaser-tap mt4">→ Tap to allocate</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+    <p class="screen-label">2 — Envelope List</p>
+  </div>
+
+  <!-- ══════════════════════════════════
+       SCREEN 3: Transaction Allocation
+  ══════════════════════════════════ -->
+  <div class="frame-wrapper">
+    <div class="phone-frame">
+      <div class="screen">
+
+        <div class="wf-statusbar">
+          <span>9:41</span>
+          <span>●●●  WiFi  100%</span>
+        </div>
+
+        <div class="wf-header">
+          <span class="wf-back">‹ Back</span>
+          <div class="wf-header-title">Monzo Personal</div>
+        </div>
+
+        <!-- Scrollable envelope list with Allocate buttons -->
+        <div class="scrollable">
+
+          <div class="wf-section-label">Envelopes — tap to allocate</div>
+
+          <div class="envelope-row">
+            <div class="envelope-info">
+              <div class="envelope-name">Groceries</div>
+              <div class="wf-bar-bg"><div class="wf-bar-fill" style="width:30%"></div></div>
+            </div>
+            <div class="envelope-amount" style="margin-right:6px;">£320.00</div>
+            <div class="wf-button small">Allocate</div>
+          </div>
+
+          <div class="envelope-row">
+            <div class="envelope-info">
+              <div class="envelope-name">Rent</div>
+              <div class="wf-bar-bg"><div class="wf-bar-fill" style="width:80%"></div></div>
+            </div>
+            <div class="envelope-amount" style="margin-right:6px;">£850.00</div>
+            <div class="wf-button small">Allocate</div>
+          </div>
+
+          <div class="envelope-row">
+            <div class="envelope-info">
+              <div class="envelope-name">Entertainment</div>
+              <div class="wf-bar-bg"><div class="wf-bar-fill" style="width:17%"></div></div>
+            </div>
+            <div class="envelope-amount" style="margin-right:6px;">£180.00</div>
+            <div class="wf-button small">Allocate</div>
+          </div>
+
+          <div class="envelope-row">
+            <div class="envelope-info">
+              <div class="envelope-name">Transport</div>
+              <div class="wf-bar-bg"><div class="wf-bar-fill" style="width:23%"></div></div>
+            </div>
+            <div class="envelope-amount" style="margin-right:6px;">£240.00</div>
+            <div class="wf-button small">Allocate</div>
+          </div>
+
+          <div class="envelope-row">
+            <div class="envelope-info">
+              <div class="envelope-name">Eating Out</div>
+              <div class="wf-bar-bg"><div class="wf-bar-fill" style="width:12%"></div></div>
+            </div>
+            <div class="envelope-amount" style="margin-right:6px;">£130.00</div>
+            <div class="wf-button small">Allocate</div>
+          </div>
+
+        </div>
+
+        <!-- Docked transaction card -->
+        <div class="wf-dock">
+
+          <div class="row spread" style="margin-bottom:8px;">
+            <span class="text-xs text-muted">1 OF 3 UNALLOCATED</span>
+            <div class="progress-dots">
+              <div class="dot"></div>
+              <div class="dot empty"></div>
+              <div class="dot empty"></div>
+            </div>
+          </div>
+
+          <div class="wf-card">
+            <div class="row spread">
+              <span class="text-bold" style="font-size:17px;">Tesco Superstore</span>
+              <span class="text-bold text-debit" style="font-size:17px;">−£18.50</span>
+            </div>
+            <div class="text-xs text-muted mt4">Debit · 24 Mar 2026</div>
+            <div class="text-xs text-muted mt4" style="font-style:italic;">REF-20260324-81726</div>
+          </div>
+
+          <div class="row mt8" style="gap:10px;">
+            <div class="wf-button" style="flex:1; text-align:center;">✂ Split</div>
+            <div class="wf-button" style="flex:1; text-align:center;">Skip →</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+    <p class="screen-label">3 — Transaction Allocation</p>
+  </div>
+
+  <!-- ══════════════════════════════════
+       SCREEN 4: Split Transaction
+  ══════════════════════════════════ -->
+  <div class="frame-wrapper">
+    <div class="phone-frame">
+      <div class="screen">
+
+        <div class="wf-statusbar">
+          <span>9:41</span>
+          <span>●●●  WiFi  100%</span>
+        </div>
+
+        <div class="wf-header">
+          <span class="wf-back">✕ Cancel</span>
+          <div class="wf-header-title" style="text-align:center;">Split Transaction</div>
+        </div>
+
+        <div class="scrollable">
+
+          <!-- Original transaction (readonly) -->
+          <div class="wf-section-label">Original Transaction</div>
+          <div class="wf-box shaded">
+            <div class="row spread">
+              <span class="text-bold">Tesco Superstore</span>
+              <span class="text-bold text-debit">−£18.50</span>
+            </div>
+            <div class="text-xs text-muted mt4">Debit · 24 Mar 2026</div>
+            <hr class="wf-divider" style="margin:8px 0;">
+            <div class="row spread">
+              <span class="text-xs text-muted">Remaining to allocate</span>
+              <span class="text-bold" style="font-size:17px;">£10.50</span>
+            </div>
+          </div>
+
+          <!-- Splits created so far -->
+          <div class="wf-section-label" style="margin-top:14px;">Splits So Far</div>
+          <div class="split-item">
+            <div>
+              <span class="text-bold">Groceries</span>
+              <span class="text-muted" style="margin-left:6px; font-size:14px;">........</span>
+            </div>
+            <div class="row" style="gap:8px;">
+              <span class="text-bold">£8.00</span>
+              <div class="split-remove">✕</div>
+            </div>
+          </div>
+
+          <hr class="wf-divider">
+
+          <!-- Add a new split -->
+          <div class="wf-section-label">Add Split</div>
+
+          <div class="text-xs text-muted" style="margin-bottom:4px; font-family:sans-serif;">Amount (max £10.50)</div>
+          <div class="wf-input" style="display:flex; align-items:center; gap:4px; padding:7px 10px;">
+            <span style="color:#aaa;">£</span>
+            <span style="flex:1; border-bottom: 1px solid #aaa; color:#aaa; font-size:16px;">_______</span>
+          </div>
+
+          <div class="wf-section-label" style="margin-top:12px;">Allocate to Envelope</div>
+
+          <div class="radio-row">
+            <div class="radio-circle selected"></div>
+            <div style="flex:1;">Groceries</div>
+            <span class="text-muted" style="font-size:14px;">£320.00</span>
+          </div>
+          <div class="radio-row">
+            <div class="radio-circle"></div>
+            <div style="flex:1;">Rent</div>
+            <span class="text-muted" style="font-size:14px;">£850.00</span>
+          </div>
+          <div class="radio-row">
+            <div class="radio-circle"></div>
+            <div style="flex:1;">Entertainment</div>
+            <span class="text-muted" style="font-size:14px;">£180.00</span>
+          </div>
+          <div class="radio-row">
+            <div class="radio-circle"></div>
+            <div style="flex:1;">Transport</div>
+            <span class="text-muted" style="font-size:14px;">£240.00</span>
+          </div>
+          <div class="radio-row">
+            <div class="radio-circle"></div>
+            <div style="flex:1;">Eating Out</div>
+            <span class="text-muted" style="font-size:14px;">£130.00</span>
+          </div>
+
+        </div>
+
+        <!-- Sticky bottom actions -->
+        <div class="wf-dock" style="border-top: 2px solid #ddd; border-top-style: solid;">
+          <div class="row" style="gap:8px;">
+            <div class="wf-button primary" style="flex:1; text-align:center;">+ Add Split</div>
+            <div class="wf-button" style="flex:1; text-align:center;">Done Splitting</div>
+          </div>
+          <div class="text-xs text-muted mt8" style="text-align:center; font-family:sans-serif;">
+            "Done Splitting" enabled when all £18.50 is allocated
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <p class="screen-label">4 — Split Transaction</p>
+  </div>
+
+  <!-- ══════════════════════════════════
+       SCREEN 5: Skipped Transactions Loop
+  ══════════════════════════════════ -->
+  <div class="frame-wrapper">
+    <div class="phone-frame">
+      <div class="screen">
+
+        <div class="wf-statusbar">
+          <span>9:41</span>
+          <span>●●●  WiFi  100%</span>
+        </div>
+
+        <div class="wf-header">
+          <span class="wf-back">‹ Back</span>
+          <div class="wf-header-title">Monzo Personal</div>
+        </div>
+
+        <!-- Amber skipped banner -->
+        <div class="skipped-banner">
+          <span>⚠</span>
+          <div class="skipped-banner-text">
+            <span style="font-weight:700;">Reviewing skipped transactions</span><br>
+            <span class="text-xs" style="font-family:sans-serif; color:#7a5e00;">1 of 2 skipped remaining</span>
+          </div>
+          <span class="wf-badge amber" style="font-size:11px;">SKIPPED</span>
+        </div>
+
+        <!-- Scrollable envelope list with Allocate buttons -->
+        <div class="scrollable">
+
+          <div class="wf-section-label">Envelopes — tap to allocate</div>
+
+          <div class="envelope-row">
+            <div class="envelope-info">
+              <div class="envelope-name">Groceries</div>
+              <div class="wf-bar-bg"><div class="wf-bar-fill" style="width:30%; background:#c8a400;"></div></div>
+            </div>
+            <div class="envelope-amount" style="margin-right:6px;">£320.00</div>
+            <div class="wf-button small amber">Allocate</div>
+          </div>
+
+          <div class="envelope-row">
+            <div class="envelope-info">
+              <div class="envelope-name">Rent</div>
+              <div class="wf-bar-bg"><div class="wf-bar-fill" style="width:80%; background:#c8a400;"></div></div>
+            </div>
+            <div class="envelope-amount" style="margin-right:6px;">£850.00</div>
+            <div class="wf-button small amber">Allocate</div>
+          </div>
+
+          <div class="envelope-row">
+            <div class="envelope-info">
+              <div class="envelope-name">Entertainment</div>
+              <div class="wf-bar-bg"><div class="wf-bar-fill" style="width:17%; background:#c8a400;"></div></div>
+            </div>
+            <div class="envelope-amount" style="margin-right:6px;">£180.00</div>
+            <div class="wf-button small amber">Allocate</div>
+          </div>
+
+          <div class="envelope-row">
+            <div class="envelope-info">
+              <div class="envelope-name">Transport</div>
+              <div class="wf-bar-bg"><div class="wf-bar-fill" style="width:23%; background:#c8a400;"></div></div>
+            </div>
+            <div class="envelope-amount" style="margin-right:6px;">£240.00</div>
+            <div class="wf-button small amber">Allocate</div>
+          </div>
+
+          <div class="envelope-row">
+            <div class="envelope-info">
+              <div class="envelope-name">Eating Out</div>
+              <div class="wf-bar-bg"><div class="wf-bar-fill" style="width:12%; background:#c8a400;"></div></div>
+            </div>
+            <div class="envelope-amount" style="margin-right:6px;">£130.00</div>
+            <div class="wf-button small amber">Allocate</div>
+          </div>
+
+        </div>
+
+        <!-- Amber-tinted docked skipped transaction -->
+        <div class="wf-dock skipped">
+
+          <div class="row spread" style="margin-bottom:8px;">
+            <span class="text-xs text-amber" style="font-family:sans-serif; text-transform:uppercase; letter-spacing:0.5px;">Skipped: 1 of 2</span>
+            <div class="progress-dots">
+              <div class="dot diamond"></div>
+              <div class="dot diamond-empty"></div>
+            </div>
+          </div>
+
+          <div class="wf-box dashed-amber">
+            <div class="row spread">
+              <span class="text-bold" style="font-size:17px;">Deliveroo</span>
+              <span class="text-bold text-debit" style="font-size:17px;">−£32.00</span>
+            </div>
+            <div class="text-xs text-muted mt4">Debit · 20 Mar 2026</div>
+            <div class="text-xs text-muted mt4" style="font-style:italic;">ORDER-9182736</div>
+          </div>
+
+          <div class="row mt8" style="gap:8px;">
+            <div class="wf-button amber" style="flex:1; text-align:center;">✂ Split</div>
+            <div class="wf-button amber" style="flex:1; text-align:center;">Skip Again →</div>
+            <div class="wf-button primary" style="flex:1; text-align:center;">Done</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+    <p class="screen-label">5 — Skipped Transactions Loop</p>
+  </div>
+
+</div><!-- /wireframe-grid -->
+
+<!-- ── Key ── -->
+<div style="max-width: 700px; margin: 3rem auto 0; padding: 1.5rem; background:#fff; border: 2px solid #ddd; border-radius: 10px; font-family: sans-serif; font-size: 14px; color: #444; line-height: 1.6;">
+  <h2 style="font-family: 'Caveat', cursive; font-size: 1.5rem; margin-bottom: 0.75rem;">Design Notes</h2>
+  <ul style="padding-left: 1.2rem;">
+    <li><strong>Progress bars</strong> show each envelope's balance as a proportion of the total across all envelopes — not progress toward a target. Rent is widest because it holds the most money.</li>
+    <li><strong>Dock</strong> (screens 3, 4, 5) stays pinned at the bottom; the envelope list scrolls above it so you can reach any envelope.</li>
+    <li><strong>Transactions are shown one at a time</strong> in the dock. Use "Allocate" to apply the full amount, or "Split" to break it across multiple envelopes.</li>
+    <li><strong>Splits</strong> (screen 4) are entered individually — enter an amount, pick an envelope, add. Repeat until the full transaction is covered.</li>
+    <li><strong>Skipped loop</strong> (screen 5) is visually distinct: amber banner, amber-tinted dock, amber progress diamonds, and amber-bordered transaction card.</li>
+    <li><strong>"Done"</strong> on screen 5 dismisses the skipped loop entirely (any remaining skipped transactions stay for next session).</li>
+  </ul>
+</div>
+
+</body>
+</html>
