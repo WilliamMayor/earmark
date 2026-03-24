@@ -1,0 +1,32 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "3000:3000"
+    environment:
+      DB_PATH: /data/transactions.db
+    volumes:
+      - db_data:/data
+    restart: unless-stopped
+
+  # The Python sync tool is a one-shot command, not a long-running service.
+  # Usage: docker compose --profile sync run --rm sync
+  sync:
+    image: ghcr.io/astral-sh/uv:python3.14-bookworm-slim
+    working_dir: /app
+    command: ["uv", "run", "sync_transactions.py"]
+    volumes:
+      - .:/app
+      - db_data:/data
+    environment:
+      DB_PATH: /data/transactions.db
+    env_file:
+      - .env
+    profiles:
+      - sync
+
+volumes:
+  db_data:
+    driver: local
