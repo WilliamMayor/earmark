@@ -1,65 +1,97 @@
 """
-Thin wrappers around the Enable Banking SDK to isolate our code from the
-third-party API surface and make it straightforward to mock in tests.
+Lunchflow API client.
+
+All bank connections are managed in the Lunchflow dashboard.
+This module handles HTTP communication and maps API responses to internal models.
 """
 
-from datetime import date, datetime
+from __future__ import annotations
+
+import warnings
+from datetime import date
 from decimal import Decimal
 from typing import Optional
 
-from .models import Transaction, TransactionStatus
+import httpx
+
+from .models import Account, Transaction, TransactionStatus
+
+_BASE_URL = "https://lunchflow.app/api/v1"
 
 
-def map_api_transaction(api_tx, account_id: int) -> Transaction:
-    """Convert an SDK Transaction object to our internal Transaction model."""
-    status_map = {
-        "BOOK": TransactionStatus.BOOKED,
-        "PDNG": TransactionStatus.PENDING,
-    }
-    status = status_map.get(api_tx.status, TransactionStatus.BOOKED)
+class LunchflowClient:
+    def __init__(self, api_key: str):
+        self._client = httpx.Client(
+            base_url=_BASE_URL,
+            headers={"x-api-key": api_key},
+        )
 
-    # Payee is the creditor for debits (money leaving) and debtor for credits
-    payee: Optional[str] = None
-    if api_tx.credit_debit_indicator == "DBIT" and api_tx.creditor:
-        payee = api_tx.creditor.name
-    elif api_tx.credit_debit_indicator == "CRDT" and api_tx.debtor:
-        payee = api_tx.debtor.name
+    def list_accounts(self) -> list[Account]:
+        response = self._client.get("/accounts")
+        response.raise_for_status()
+        return [_map_account(a) for a in response.json()["accounts"]]
 
-    booking_date = date.fromisoformat(api_tx.booking_date) if api_tx.booking_date else None
-    value_date = date.fromisoformat(api_tx.value_date) if api_tx.value_date else None
+    def get_transactions(self, account_id: int) -> list[Transaction]:
+        response = self._client.get(
+            f"/accounts/{account_id}/transactions",
+            params={"include_pending": "true"},
+        )
+        response.raise_for_status()
+        result = []
+        for tx_data in response.json()["transactions"]:
+            tx = _map_transaction(tx_data)
+            if tx is not None:
+                result.append(tx)
+        return result
 
-    # Store the raw API response so no data is lost
-    raw_data = api_tx.model_dump() if hasattr(api_tx, "model_dump") else None
+    def get_balance(self, account_id: int) -> Decimal:
+        response = self._client.get(f"/accounts/{account_id}/balance")
+        response.raise_for_status()
+        return Decimal(str(response.json()["balance"]["amount"]))
 
-    return Transaction(
-        account_id=account_id,
-        entry_reference=api_tx.entry_reference,
-        booking_date=booking_date,
-        value_date=value_date,
-        amount=Decimal(str(api_tx.transaction_amount.amount)),
-        currency=api_tx.transaction_amount.currency,
-        credit_debit_indicator=api_tx.credit_debit_indicator,
-        status=status,
-        payee=payee,
-        remittance_information=api_tx.remittance_information,
-        note=getattr(api_tx, "note", None),
-        raw_data=raw_data,
+    def close(self) -> None:
+        self._client.close()
+
+    def __enter__(self) -> LunchflowClient:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self.close()
+
+
+def _map_account(data: dict) -> Account:
+    return Account(
+        lunchflow_id=data["id"],
+        name=data.get("name"),
+        institution_name=data.get("institution_name"),
+        currency=data["currency"],
     )
 
 
-def fetch_transactions(
-    service,  # EnableBankingService
-    account_uid: str,
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-) -> list:
-    """
-    Fetch all transactions for an account. Pagination is handled automatically
-    by the SDK's get_account_transactions method.
-    """
-    kwargs: dict = {}
-    if date_from:
-        kwargs["date_from"] = datetime.combine(date_from, datetime.min.time())
-    if date_to:
-        kwargs["date_to"] = datetime.combine(date_to, datetime.min.time())
-    return service.get_account_transactions(account_uid=account_uid, **kwargs)
+def _map_transaction(data: dict) -> Optional[Transaction]:
+    lunchflow_id = data.get("id")
+    if lunchflow_id is None:
+        warnings.warn(f"Skipping transaction with null id: {data}")
+        return None
+
+    raw_amount = Decimal(str(data["amount"]))
+    if raw_amount < 0:
+        credit_debit_indicator = "DBIT"
+        amount = -raw_amount
+    else:
+        credit_debit_indicator = "CRDT"
+        amount = raw_amount
+
+    tx_date = date.fromisoformat(data["date"]) if data.get("date") else None
+
+    return Transaction(
+        account_id=data["accountId"],
+        lunchflow_id=lunchflow_id,
+        amount=amount,
+        currency=data["currency"],
+        credit_debit_indicator=credit_debit_indicator,
+        status=TransactionStatus.PENDING if data.get("isPending") else TransactionStatus.BOOKED,
+        date=tx_date,
+        merchant=data.get("merchant"),
+        description=data.get("description"),
+    )
