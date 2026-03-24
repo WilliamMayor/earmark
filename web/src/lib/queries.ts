@@ -1,12 +1,14 @@
 import type Database from 'better-sqlite3';
 import { getDb, withRetry } from './db.js';
-import { sumAmounts, amountsMatch, toMinorUnits } from './format.js';
+import { sumAmounts, amountsMatch, toMinorUnits, fromMinorUnits } from './format.js';
 import {
 	AlreadyAllocatedError,
 	EnvelopeHasAllocationsError,
 	SplitValidationError,
+	WithdrawalValidationError,
 	type AccountWithStats,
 	type EnvelopeWithStats,
+	type EnvelopeWithdrawal,
 	type Split,
 	type SplitWithStatus,
 	type Transaction
@@ -35,7 +37,10 @@ export function getAccounts(db: Database.Database = getDb()): AccountWithStats[]
 				WHEN t.credit_debit_indicator = 'DBIT'
 				AND  t.status IN ('booked', 'pending')
 				THEN 1
-			END) AS unallocated_count
+			END) + COALESCE((
+				SELECT COUNT(*) FROM envelope_withdrawals ew
+				WHERE ew.account_id = a.id AND ew.to_envelope_id IS NULL
+			), 0) AS unallocated_count
 		FROM accounts a
 		LEFT JOIN transactions t ON t.account_id = a.id
 		GROUP BY a.id
@@ -68,7 +73,10 @@ export function getAccount(
 				WHEN t.credit_debit_indicator = 'DBIT'
 				AND  t.status IN ('booked', 'pending')
 				THEN 1
-			END) AS unallocated_count
+			END) + COALESCE((
+				SELECT COUNT(*) FROM envelope_withdrawals ew
+				WHERE ew.account_id = a.id AND ew.to_envelope_id IS NULL
+			), 0) AS unallocated_count
 		FROM accounts a
 		LEFT JOIN transactions t ON t.account_id = a.id
 		WHERE a.id = ?
@@ -96,7 +104,18 @@ export function getEnvelopes(
 			e.*,
 			COALESCE(SUM(
 				CASE WHEN t.credit_debit_indicator = 'DBIT' THEN CAST(s.amount AS REAL) ELSE 0 END
-			), 0) AS allocated_raw
+			), 0)
+			+ COALESCE((
+				SELECT SUM(CAST(ew.amount AS REAL))
+				FROM envelope_withdrawals ew
+				WHERE ew.to_envelope_id = e.id
+			), 0)
+			- COALESCE((
+				SELECT SUM(CAST(ew.amount AS REAL))
+				FROM envelope_withdrawals ew
+				WHERE ew.from_envelope_id = e.id
+			), 0)
+			AS allocated_raw
 		FROM envelopes e
 		LEFT JOIN allocations al ON al.envelope_id = e.id
 		LEFT JOIN splits s ON s.id = al.split_id
@@ -298,6 +317,83 @@ export function allocateSplit(
 		}
 		throw err;
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Envelope withdrawals
+// ---------------------------------------------------------------------------
+
+export function getUnallocatedWithdrawals(
+	accountId: number,
+	db: Database.Database = getDb()
+): EnvelopeWithdrawal[] {
+	return db
+		.prepare(
+			`
+		SELECT ew.*, e.name AS from_envelope_name
+		FROM envelope_withdrawals ew
+		JOIN envelopes e ON e.id = ew.from_envelope_id
+		WHERE ew.account_id = ?
+		  AND ew.to_envelope_id IS NULL
+		ORDER BY ew.created_at ASC, ew.id ASC
+	`
+		)
+		.all(accountId) as EnvelopeWithdrawal[];
+}
+
+export function createWithdrawal(
+	accountId: number,
+	fromEnvelopeId: number,
+	amount: string,
+	note: string | null,
+	db: Database.Database = getDb()
+): number {
+	const minor = toMinorUnits(amount);
+	if (isNaN(minor) || minor <= 0) {
+		throw new WithdrawalValidationError('Amount must be greater than zero');
+	}
+
+	const envelope = db
+		.prepare(`SELECT id FROM envelopes WHERE id = ? AND account_id = ?`)
+		.get(fromEnvelopeId, accountId);
+	if (!envelope) throw new WithdrawalValidationError('Envelope not found');
+
+	const storedAmount = fromMinorUnits(minor);
+	const result = withRetry(() =>
+		db
+			.prepare(
+				`INSERT INTO envelope_withdrawals (account_id, from_envelope_id, amount, note) VALUES (?, ?, ?, ?)`
+			)
+			.run(accountId, fromEnvelopeId, storedAmount, note ?? null)
+	);
+	return result.lastInsertRowid as number;
+}
+
+export function allocateWithdrawal(
+	withdrawalId: number,
+	toEnvelopeId: number,
+	db: Database.Database = getDb()
+): void {
+	const withdrawal = db
+		.prepare(`SELECT * FROM envelope_withdrawals WHERE id = ?`)
+		.get(withdrawalId) as { from_envelope_id: number; to_envelope_id: number | null; account_id: number } | null;
+
+	if (!withdrawal) throw new Error(`Withdrawal ${withdrawalId} not found`);
+	if (withdrawal.to_envelope_id !== null) throw new Error(`Withdrawal ${withdrawalId} is already allocated`);
+	if (withdrawal.from_envelope_id === toEnvelopeId) {
+		throw new WithdrawalValidationError('Cannot allocate withdrawal back to the same envelope');
+	}
+
+	const destEnvelope = db
+		.prepare(`SELECT id FROM envelopes WHERE id = ? AND account_id = ?`)
+		.get(toEnvelopeId, withdrawal.account_id);
+	if (!destEnvelope) throw new WithdrawalValidationError('Destination envelope not found');
+
+	withRetry(() =>
+		db
+			.prepare(`UPDATE envelope_withdrawals SET to_envelope_id = ? WHERE id = ?`)
+			.run(toEnvelopeId, withdrawalId)
+	);
 }
 
 // ---------------------------------------------------------------------------

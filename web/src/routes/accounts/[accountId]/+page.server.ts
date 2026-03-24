@@ -1,32 +1,48 @@
-import { error, fail, redirect } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import {
 	getEnvelopes,
 	getUnallocatedTransactions,
+	getUnallocatedWithdrawals,
 	createEnvelope,
 	renameEnvelope,
 	deleteEnvelope,
 	allocateSplit,
+	allocateWithdrawal,
+	createWithdrawal,
 	getSplitsWithStatus
 } from '$lib/queries.js';
-import { AlreadyAllocatedError, EnvelopeHasAllocationsError } from '$lib/types.js';
+import {
+	AlreadyAllocatedError,
+	EnvelopeHasAllocationsError,
+	WithdrawalValidationError
+} from '$lib/types.js';
+import { toMinorUnits } from '$lib/format.js';
 
 export function load({ params, url }) {
 	const accountId = parseInt(params.accountId, 10);
 
 	const envelopes = getEnvelopes(accountId);
-	const unallocated = getUnallocatedTransactions(accountId);
-	const mode = unallocated.length > 0 ? 'allocate' : 'clean';
+	const unallocatedTransactions = getUnallocatedTransactions(accountId);
+	const unallocatedWithdrawals = getUnallocatedWithdrawals(accountId);
+
+	// Unified queue: pending withdrawals first, then transactions
+	const queue = [
+		...unallocatedWithdrawals.map((w) => ({ kind: 'withdrawal' as const, withdrawal: w })),
+		...unallocatedTransactions.map((tx) => ({ kind: 'transaction' as const, tx }))
+	];
+
+	const mode = queue.length > 0 ? 'allocate' : 'clean';
 
 	const txParam = url.searchParams.get('tx');
 	const rawIndex = txParam !== null ? parseInt(txParam, 10) : 0;
-	const currentTxIndex =
-		unallocated.length > 0 ? Math.max(0, Math.min(rawIndex, unallocated.length - 1)) : 0;
+	const currentIndex = queue.length > 0 ? Math.max(0, Math.min(rawIndex, queue.length - 1)) : 0;
+	const currentItem = queue[currentIndex] ?? null;
 
-	// Load splits for the current transaction so the dock can show split parts
-	const currentTx = unallocated[currentTxIndex] ?? null;
-	const currentSplits = currentTx ? getSplitsWithStatus(currentTx.id) : [];
+	// Load splits only for the current item if it's a transaction
+	const currentSplits =
+		currentItem?.kind === 'transaction' ? getSplitsWithStatus(currentItem.tx.id) : [];
 
-	return { envelopes, unallocated, mode, currentTxIndex, currentTx, currentSplits };
+	return { envelopes, queue, mode, currentIndex, currentItem, currentSplits };
 }
 
 export const actions = {
@@ -46,10 +62,57 @@ export const actions = {
 			throw err;
 		}
 
-		// Work out where to redirect: stay at same index (now points to next tx)
-		const unallocated = getUnallocatedTransactions(accountId);
-		const nextIndex = Math.min(currentIndex, Math.max(0, unallocated.length - 1));
+		const unallocatedTransactions = getUnallocatedTransactions(accountId);
+		const unallocatedWithdrawals = getUnallocatedWithdrawals(accountId);
+		const queueLength = unallocatedWithdrawals.length + unallocatedTransactions.length;
+		const nextIndex = Math.min(currentIndex, Math.max(0, queueLength - 1));
 		redirect(303, `/accounts/${accountId}?tx=${nextIndex}`);
+	},
+
+	allocate_withdrawal: async ({ request, params }) => {
+		const accountId = parseInt(params.accountId, 10);
+		const data = await request.formData();
+		const envelopeId = parseInt(data.get('envelope_id') as string, 10);
+		const withdrawalId = parseInt(data.get('withdrawal_id') as string, 10);
+		const currentIndex = parseInt((data.get('current_index') as string) ?? '0', 10);
+
+		if (isNaN(envelopeId) || isNaN(withdrawalId)) return fail(400, { error: 'Invalid input' });
+
+		try {
+			allocateWithdrawal(withdrawalId, envelopeId);
+		} catch (err) {
+			if (err instanceof WithdrawalValidationError) return fail(400, { error: err.message });
+			throw err;
+		}
+
+		const unallocatedTransactions = getUnallocatedTransactions(accountId);
+		const unallocatedWithdrawals = getUnallocatedWithdrawals(accountId);
+		const queueLength = unallocatedWithdrawals.length + unallocatedTransactions.length;
+		const nextIndex = Math.min(currentIndex, Math.max(0, queueLength - 1));
+		redirect(303, `/accounts/${accountId}?tx=${nextIndex}`);
+	},
+
+	create_withdrawal: async ({ request, params }) => {
+		const accountId = parseInt(params.accountId, 10);
+		const data = await request.formData();
+		const fromEnvelopeId = parseInt(data.get('from_envelope_id') as string, 10);
+		const amountStr = (data.get('amount') as string)?.trim();
+		const note = (data.get('note') as string)?.trim() || null;
+
+		if (isNaN(fromEnvelopeId)) return fail(400, { error: 'Invalid envelope' });
+		if (!amountStr) return fail(400, { error: 'Amount is required' });
+
+		const minor = toMinorUnits(amountStr);
+		if (isNaN(minor) || minor <= 0) return fail(400, { error: 'Amount must be a positive number' });
+
+		try {
+			createWithdrawal(accountId, fromEnvelopeId, amountStr, note);
+		} catch (err) {
+			if (err instanceof WithdrawalValidationError) return fail(400, { error: err.message });
+			throw err;
+		}
+
+		redirect(303, `/accounts/${accountId}?tx=0`);
 	},
 
 	create_envelope: async ({ request, params }) => {

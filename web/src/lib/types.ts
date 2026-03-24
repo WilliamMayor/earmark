@@ -75,3 +75,21 @@ export class EnvelopeHasAllocationsError extends Error {
 		this.name = 'EnvelopeHasAllocationsError';
 	}
 }
+
+export interface EnvelopeWithdrawal {
+	id: number;
+	account_id: number;
+	from_envelope_id: number;
+	from_envelope_name: string;
+	to_envelope_id: number | null;
+	amount: string;
+	note: string | null;
+	created_at: string;
+}
+
+export class WithdrawalValidationError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'WithdrawalValidationError';
+	}
+}

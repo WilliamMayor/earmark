@@ -9,6 +9,9 @@
 	let newEnvelopeName = $state('');
 	let renamingId = $state<number | null>(null);
 	let renameValue = $state('');
+	let withdrawingId = $state<number | null>(null);
+	let withdrawAmount = $state('');
+	let withdrawNote = $state('');
 
 	// Swipe state
 	let touchStartX = $state(0);
@@ -21,15 +24,15 @@
 		const delta = e.changedTouches[0].clientX - touchStartX;
 		if (Math.abs(delta) < 50) return;
 
-		const { unallocated, currentTxIndex } = data;
-		if (unallocated.length === 0) return;
+		const { queue, currentIndex } = data;
+		if (queue.length === 0) return;
 
 		const nextIndex =
 			delta < 0
-				? Math.min(currentTxIndex + 1, unallocated.length - 1)
-				: Math.max(currentTxIndex - 1, 0);
+				? Math.min(currentIndex + 1, queue.length - 1)
+				: Math.max(currentIndex - 1, 0);
 
-		if (nextIndex !== currentTxIndex) {
+		if (nextIndex !== currentIndex) {
 			goto(`?tx=${nextIndex}`, { replaceState: true });
 		}
 	}
@@ -42,6 +45,18 @@
 	function cancelRename() {
 		renamingId = null;
 		renameValue = '';
+	}
+
+	function startWithdraw(id: number) {
+		withdrawingId = id;
+		withdrawAmount = '';
+		withdrawNote = '';
+	}
+
+	function cancelWithdraw() {
+		withdrawingId = null;
+		withdrawAmount = '';
+		withdrawNote = '';
 	}
 
 	const { account } = data;
@@ -145,6 +160,37 @@
 							<button type="button" onclick={cancelRename} class="text-xs text-gray-500">Cancel</button>
 						</div>
 					</form>
+				{:else if withdrawingId === envelope.id}
+					<!-- Withdraw form -->
+					<form
+						method="POST"
+						action="?/create_withdrawal"
+						use:enhance={() => ({ update }) => { update(); cancelWithdraw(); }}
+					>
+						<input type="hidden" name="from_envelope_id" value={envelope.id} />
+						<p class="text-sm font-medium text-gray-700 mb-2">Withdraw from {envelope.name}</p>
+						<input
+							name="amount"
+							type="text"
+							inputmode="decimal"
+							bind:value={withdrawAmount}
+							class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 mb-2"
+							placeholder="Amount (e.g. 50.00)"
+							required
+							autofocus
+						/>
+						<input
+							name="note"
+							type="text"
+							bind:value={withdrawNote}
+							class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 mb-2"
+							placeholder="Note (optional)"
+						/>
+						<div class="flex gap-2">
+							<button type="submit" class="text-xs text-orange-600 font-medium">Withdraw</button>
+							<button type="button" onclick={cancelWithdraw} class="text-xs text-gray-500">Cancel</button>
+						</div>
+					</form>
 				{:else}
 					<div class="flex items-start justify-between mb-3">
 						<div>
@@ -154,16 +200,31 @@
 							</p>
 						</div>
 						<div class="flex items-center gap-1">
-							{#if data.mode === 'allocate' && data.currentTx}
-								{@const unallocatedSplit = data.currentSplits.find(s => !s.is_allocated)}
-								{#if unallocatedSplit}
-									<form method="POST" action="?/allocate" use:enhance>
+							{#if data.mode === 'allocate' && data.currentItem}
+								{#if data.currentItem.kind === 'transaction'}
+									{@const unallocatedSplit = data.currentSplits.find(s => !s.is_allocated)}
+									{#if unallocatedSplit}
+										<form method="POST" action="?/allocate" use:enhance>
+											<input type="hidden" name="envelope_id" value={envelope.id} />
+											<input type="hidden" name="split_id" value={unallocatedSplit.id} />
+											<input type="hidden" name="current_index" value={data.currentIndex} />
+											<button
+												type="submit"
+												class="bg-indigo-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-indigo-700"
+												data-testid="allocate-btn"
+											>
+												Allocate
+											</button>
+										</form>
+									{/if}
+								{:else if data.currentItem.kind === 'withdrawal' && envelope.id !== data.currentItem.withdrawal.from_envelope_id}
+									<form method="POST" action="?/allocate_withdrawal" use:enhance>
 										<input type="hidden" name="envelope_id" value={envelope.id} />
-										<input type="hidden" name="split_id" value={unallocatedSplit.id} />
-										<input type="hidden" name="current_index" value={data.currentTxIndex} />
+										<input type="hidden" name="withdrawal_id" value={data.currentItem.withdrawal.id} />
+										<input type="hidden" name="current_index" value={data.currentIndex} />
 										<button
 											type="submit"
-											class="bg-indigo-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-indigo-700"
+											class="bg-orange-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-orange-600"
 											data-testid="allocate-btn"
 										>
 											Allocate
@@ -171,6 +232,17 @@
 									</form>
 								{/if}
 							{/if}
+							<button
+								onclick={() => startWithdraw(envelope.id)}
+								class="p-1.5 text-gray-400 hover:text-orange-500 rounded"
+								aria-label="Withdraw from envelope"
+								title="Withdraw from envelope"
+							>
+								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+										d="M12 19V5m0 0l-7 7m7-7l7 7" />
+								</svg>
+							</button>
 							<button
 								onclick={() => startRename(envelope.id, envelope.name)}
 								class="p-1.5 text-gray-400 hover:text-gray-600 rounded"
@@ -213,12 +285,7 @@
 	</main>
 
 	<!-- Dock: pinned to bottom when in allocate mode -->
-	{#if data.mode === 'allocate' && data.currentTx}
-		{@const tx = data.currentTx}
-		{@const splits = data.currentSplits}
-		{@const isMultiSplit = splits.length > 1}
-		{@const unallocatedSplits = splits.filter(s => !s.is_allocated)}
-
+	{#if data.mode === 'allocate' && data.currentItem}
 		<div
 			class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg max-w-lg mx-auto"
 			ontouchstart={handleTouchStart}
@@ -228,10 +295,10 @@
 			<!-- Navigation -->
 			<div class="flex items-center justify-between px-4 pt-3 pb-1">
 				<button
-					onclick={() => goto(`?tx=${Math.max(0, data.currentTxIndex - 1)}`, { replaceState: true })}
-					disabled={data.currentTxIndex === 0}
+					onclick={() => goto(`?tx=${Math.max(0, data.currentIndex - 1)}`, { replaceState: true })}
+					disabled={data.currentIndex === 0}
 					class="p-1 text-gray-400 disabled:opacity-30 hover:text-gray-600"
-					aria-label="Previous transaction"
+					aria-label="Previous"
 				>
 					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -239,17 +306,18 @@
 				</button>
 
 				<span class="text-xs text-gray-400">
-					{data.currentTxIndex + 1} of {data.unallocated.length}
-					{#if isMultiSplit}
+					{data.currentIndex + 1} of {data.queue.length}
+					{#if data.currentItem.kind === 'transaction' && data.currentSplits.length > 1}
+						{@const unallocatedSplits = data.currentSplits.filter(s => !s.is_allocated)}
 						· ✂ Split ({unallocatedSplits.length} parts left)
 					{/if}
 				</span>
 
 				<button
-					onclick={() => goto(`?tx=${Math.min(data.unallocated.length - 1, data.currentTxIndex + 1)}`, { replaceState: true })}
-					disabled={data.currentTxIndex === data.unallocated.length - 1}
+					onclick={() => goto(`?tx=${Math.min(data.queue.length - 1, data.currentIndex + 1)}`, { replaceState: true })}
+					disabled={data.currentIndex === data.queue.length - 1}
 					class="p-1 text-gray-400 disabled:opacity-30 hover:text-gray-600"
-					aria-label="Next transaction"
+					aria-label="Next"
 				>
 					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -257,54 +325,77 @@
 				</button>
 			</div>
 
-			<!-- Transaction card -->
+			<!-- Item card -->
 			<div class="px-4 pb-4">
-				<div class="flex items-start justify-between mb-1">
-					<div class="flex-1 min-w-0">
-						<p class="font-semibold text-gray-900 truncate">{tx.payee ?? 'Unknown payee'}</p>
-						{#if tx.remittance_information}
-							<p class="text-xs text-gray-400 truncate">{tx.remittance_information}</p>
-						{/if}
-						<p class="text-xs text-gray-400">{formatDate(tx.booking_date)}</p>
-					</div>
-					<div class="text-right ml-4 shrink-0">
-						<p class="font-bold text-gray-900">{formatCurrency(tx.amount, tx.currency)}</p>
-						{#if isMultiSplit && unallocatedSplits.length > 0}
-							<p class="text-xs text-indigo-600 font-medium">
-								Next: {formatCurrency(unallocatedSplits[0].amount, tx.currency)}
-							</p>
-						{/if}
-					</div>
-				</div>
+				{#if data.currentItem.kind === 'transaction'}
+					{@const tx = data.currentItem.tx}
+					{@const splits = data.currentSplits}
+					{@const isMultiSplit = splits.length > 1}
+					{@const unallocatedSplits = splits.filter(s => !s.is_allocated)}
 
-				<!-- Split parts summary (if split) -->
-				{#if isMultiSplit}
-					<div class="mt-2 space-y-1">
-						{#each splits as split, i (split.id)}
-							<div class="flex items-center gap-2 text-xs">
-								<span class={split.is_allocated ? 'text-green-600' : 'text-gray-400'}>
-									{split.is_allocated ? '✓' : '○'}
-								</span>
-								<span class="text-gray-600">{formatCurrency(split.amount, tx.currency)}</span>
-								{#if split.note}<span class="text-gray-400">— {split.note}</span>{/if}
-								{#if split.is_allocated && split.envelope_name}
-									<span class="text-green-600 ml-auto">{split.envelope_name}</span>
-								{/if}
-							</div>
-						{/each}
+					<div class="flex items-start justify-between mb-1">
+						<div class="flex-1 min-w-0">
+							<p class="font-semibold text-gray-900 truncate">{tx.payee ?? 'Unknown payee'}</p>
+							{#if tx.remittance_information}
+								<p class="text-xs text-gray-400 truncate">{tx.remittance_information}</p>
+							{/if}
+							<p class="text-xs text-gray-400">{formatDate(tx.booking_date)}</p>
+						</div>
+						<div class="text-right ml-4 shrink-0">
+							<p class="font-bold text-gray-900">{formatCurrency(tx.amount, tx.currency)}</p>
+							{#if isMultiSplit && unallocatedSplits.length > 0}
+								<p class="text-xs text-indigo-600 font-medium">
+									Next: {formatCurrency(unallocatedSplits[0].amount, tx.currency)}
+								</p>
+							{/if}
+						</div>
+					</div>
+
+					<!-- Split parts summary (if split) -->
+					{#if isMultiSplit}
+						<div class="mt-2 space-y-1">
+							{#each splits as split (split.id)}
+								<div class="flex items-center gap-2 text-xs">
+									<span class={split.is_allocated ? 'text-green-600' : 'text-gray-400'}>
+										{split.is_allocated ? '✓' : '○'}
+									</span>
+									<span class="text-gray-600">{formatCurrency(split.amount, tx.currency)}</span>
+									{#if split.note}<span class="text-gray-400">— {split.note}</span>{/if}
+									{#if split.is_allocated && split.envelope_name}
+										<span class="text-green-600 ml-auto">{split.envelope_name}</span>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					{/if}
+
+					<!-- Actions -->
+					<div class="flex gap-2 mt-3">
+						<a
+							href="/accounts/{account.id}/split?tx={tx.id}"
+							class="flex-1 text-center bg-gray-100 text-gray-700 text-sm font-medium rounded-lg py-2 hover:bg-gray-200"
+							data-testid="split-btn"
+						>
+							✂ Split
+						</a>
+					</div>
+
+				{:else}
+					{@const w = data.currentItem.withdrawal}
+
+					<div class="flex items-start justify-between mb-1">
+						<div class="flex-1 min-w-0">
+							<p class="font-semibold text-gray-900">Withdrawal from {w.from_envelope_name}</p>
+							{#if w.note}
+								<p class="text-xs text-gray-400 truncate">{w.note}</p>
+							{/if}
+							<p class="text-xs text-orange-500">Choose a destination envelope</p>
+						</div>
+						<div class="text-right ml-4 shrink-0">
+							<p class="font-bold text-orange-600">{formatCurrency(w.amount, account.currency)}</p>
+						</div>
 					</div>
 				{/if}
-
-				<!-- Actions -->
-				<div class="flex gap-2 mt-3">
-					<a
-						href="/accounts/{account.id}/split?tx={tx.id}"
-						class="flex-1 text-center bg-gray-100 text-gray-700 text-sm font-medium rounded-lg py-2 hover:bg-gray-200"
-						data-testid="split-btn"
-					>
-						✂ Split
-					</a>
-				</div>
 			</div>
 		</div>
 	{/if}
