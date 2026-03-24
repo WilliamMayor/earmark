@@ -139,6 +139,7 @@ def test_update_transaction_status(db_conn, saved_account):
     tx = insert_transaction(
         db_conn, make_transaction(saved_account.id, status=TransactionStatus.PENDING)
     )
+    assert tx.id is not None
     update_transaction_status(db_conn, tx.id, TransactionStatus.BOOKED)
     result = get_transactions_for_account(db_conn, saved_account.id)
     assert result[0].status == TransactionStatus.BOOKED

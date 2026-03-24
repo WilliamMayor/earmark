@@ -33,15 +33,14 @@ def saved_account(db_conn):
 
 def make_transaction(account_id: int, **overrides) -> Transaction:
     """Build a Transaction with sensible defaults; override any field via kwargs."""
-    defaults = dict(
-        account_id=account_id,
-        amount=Decimal("10.00"),
-        currency="GBP",
-        credit_debit_indicator="DBIT",
-        status=TransactionStatus.BOOKED,
-        date=date(2025, 6, 1),
-        merchant="Tesco",
-        lunchflow_id=None,
+    return Transaction(
+        account_id=overrides.get("account_id", account_id),
+        amount=overrides.get("amount", Decimal("10.00")),
+        currency=overrides.get("currency", "GBP"),
+        credit_debit_indicator=overrides.get("credit_debit_indicator", "DBIT"),
+        status=overrides.get("status", TransactionStatus.BOOKED),
+        date=overrides.get("date", date(2025, 6, 1)),
+        merchant=overrides.get("merchant", "Tesco"),
+        lunchflow_id=overrides.get("lunchflow_id", None),
+        note=overrides.get("note", None),
     )
-    defaults.update(overrides)
-    return Transaction(**defaults)
