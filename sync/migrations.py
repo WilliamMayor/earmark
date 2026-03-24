@@ -65,16 +65,22 @@ def run_migrations(
         statements = _split_statements(sql)
 
         try:
+            # Use explicit SQL BEGIN/COMMIT rather than conn.commit()/rollback().
+            # Python's sqlite3 module auto-commits DDL (CREATE TABLE, ALTER TABLE,
+            # etc.) before Python-level transaction management can protect them.
+            # Explicit SQL transactions bypass that behaviour — SQLite's own DDL
+            # is fully transactional, so a ROLLBACK here undoes schema changes too.
+            conn.execute("BEGIN")
             for statement in statements:
                 conn.execute(statement)
             conn.execute(
                 "INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)",
                 (path.name, datetime.now(timezone.utc).isoformat()),
             )
-            conn.commit()
+            conn.execute("COMMIT")
             ran.append(path.name)
         except Exception as exc:
-            conn.rollback()
+            conn.execute("ROLLBACK")
             raise RuntimeError(f"Migration {path.name!r} failed: {exc}") from exc
 
     return ran

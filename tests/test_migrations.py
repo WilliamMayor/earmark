@@ -135,6 +135,22 @@ def test_multi_statement_migration(conn, migrations_dir):
     assert "posts" in tables
 
 
+def test_failed_migration_rolls_back_ddl(conn, migrations_dir):
+    # First statement is valid DDL; second is invalid. Both should be absent
+    # after the failure — the transaction must cover DDL, not just DML.
+    sql = """
+    CREATE TABLE should_not_exist (id INTEGER PRIMARY KEY);
+    THIS IS NOT VALID SQL;
+    """
+    write_migration(migrations_dir, "0001_partial.sql", sql)
+
+    with pytest.raises(RuntimeError):
+        run_migrations(conn, migrations_dir)
+
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+    assert "should_not_exist" not in tables
+
+
 def test_migration_with_comments(conn, migrations_dir):
     sql = """
     -- Create the widgets table
