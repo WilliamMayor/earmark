@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 from .migrations import run_migrations
-from .models import Account, PsuType, Session, Transaction, TransactionStatus
+from .models import Account, Transaction, TransactionStatus
 
 
 def get_connection(db_path: Union[Path, str]) -> sqlite3.Connection:
