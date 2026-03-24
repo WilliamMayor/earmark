@@ -5,6 +5,7 @@ export interface Account {
 	name: string | null;
 	currency: string;
 	last_synced_at: string | null;
+	round_up: boolean;
 }
 
 export interface AccountWithStats extends Account {
@@ -45,6 +46,7 @@ export interface Split {
 	amount: string;
 	note: string | null;
 	sort_order: number;
+	is_round_up: boolean;
 }
 
 export interface SplitWithStatus extends Split {

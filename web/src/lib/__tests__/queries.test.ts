@@ -8,6 +8,9 @@ import {
 } from './fixtures.js';
 import {
 	ensureDefaultSplit,
+	ensureRoundUpSplit,
+	getOrCreateRoundUpEnvelope,
+	setAccountRoundUp,
 	getSplitsWithStatus,
 	saveSplits,
 	allocateSplit,
@@ -15,7 +18,8 @@ import {
 	getEnvelopes,
 	createEnvelope,
 	deleteEnvelope,
-	resetSplits
+	resetSplits,
+	ROUND_UP_ENVELOPE_NAME
 } from '../queries.js';
 import {
 	SplitValidationError,
@@ -324,5 +328,203 @@ describe('getSplitsWithStatus', () => {
 		expect(splits[0].is_allocated).toBe(true);
 		expect(splits[0].envelope_id).toBe(envelopeId);
 		expect(splits[0].envelope_name).toBe('Transport');
+	});
+});
+
+// ---------------------------------------------------------------------------
+// getOrCreateRoundUpEnvelope
+// ---------------------------------------------------------------------------
+
+describe('getOrCreateRoundUpEnvelope', () => {
+	it('creates the Round Up envelope on first call', () => {
+		const envelopeId = getOrCreateRoundUpEnvelope(accountId, db);
+		const row = db.prepare(`SELECT name FROM envelopes WHERE id = ?`).get(envelopeId) as { name: string };
+		expect(row.name).toBe(ROUND_UP_ENVELOPE_NAME);
+	});
+
+	it('returns the same id on subsequent calls (idempotent)', () => {
+		const id1 = getOrCreateRoundUpEnvelope(accountId, db);
+		const id2 = getOrCreateRoundUpEnvelope(accountId, db);
+		expect(id1).toBe(id2);
+	});
+
+	it('creates separate envelopes for different accounts', () => {
+		// Insert a second account directly to avoid session_id collision in seedAccount
+		db.prepare(
+			`INSERT INTO accounts (session_id, account_uid, aspsp_name, name, currency)
+			 VALUES (1, 'uid-second', 'Barclays', 'Current', 'GBP')`
+		).run();
+		const accountId2 = (db.prepare(`SELECT last_insert_rowid() AS id`).get() as { id: number }).id;
+		const id1 = getOrCreateRoundUpEnvelope(accountId, db);
+		const id2 = getOrCreateRoundUpEnvelope(accountId2, db);
+		expect(id1).not.toBe(id2);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// ensureRoundUpSplit
+// ---------------------------------------------------------------------------
+
+describe('ensureRoundUpSplit', () => {
+	beforeEach(() => {
+		// Enable round_up on the account
+		db.prepare(`UPDATE accounts SET round_up = 1 WHERE id = ?`).run(accountId);
+	});
+
+	it('creates a round-up split for a non-whole DBIT amount', () => {
+		const txId = seedTransaction(db, accountId, { amount: '4.75' });
+		ensureDefaultSplit(txId, db);
+
+		const splits = db.prepare(`SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 1`).all(txId) as Array<{ amount: string }>;
+		expect(splits).toHaveLength(1);
+		expect(splits[0].amount).toBe('0.25');
+	});
+
+	it('auto-allocates the round-up split to the Round Up envelope', () => {
+		const txId = seedTransaction(db, accountId, { amount: '4.75' });
+		ensureDefaultSplit(txId, db);
+
+		const roundUpSplit = db.prepare(`SELECT id FROM splits WHERE transaction_id = ? AND is_round_up = 1`).get(txId) as { id: number };
+		const alloc = db.prepare(`SELECT * FROM allocations WHERE split_id = ?`).get(roundUpSplit.id);
+		expect(alloc).toBeTruthy();
+
+		const envelope = db.prepare(
+			`SELECT e.name FROM envelopes e JOIN allocations al ON al.envelope_id = e.id WHERE al.split_id = ?`
+		).get(roundUpSplit.id) as { name: string };
+		expect(envelope.name).toBe(ROUND_UP_ENVELOPE_NAME);
+	});
+
+	it('does not create a round-up split for a whole-number amount', () => {
+		const txId = seedTransaction(db, accountId, { amount: '5.00' });
+		ensureDefaultSplit(txId, db);
+
+		const splits = db.prepare(`SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 1`).all(txId);
+		expect(splits).toHaveLength(0);
+	});
+
+	it('does not create a round-up split for CRDT transactions', () => {
+		const txId = seedTransaction(db, accountId, { amount: '4.75', creditDebit: 'CRDT' });
+		ensureDefaultSplit(txId, db);
+
+		const splits = db.prepare(`SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 1`).all(txId);
+		expect(splits).toHaveLength(0);
+	});
+
+	it('does not create a round-up split when round_up is disabled', () => {
+		db.prepare(`UPDATE accounts SET round_up = 0 WHERE id = ?`).run(accountId);
+		const txId = seedTransaction(db, accountId, { amount: '4.75' });
+		ensureDefaultSplit(txId, db);
+
+		const splits = db.prepare(`SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 1`).all(txId);
+		expect(splits).toHaveLength(0);
+	});
+
+	it('is idempotent — does not create a second round-up split on repeated calls', () => {
+		const txId = seedTransaction(db, accountId, { amount: '4.75' });
+		ensureRoundUpSplit(txId, db);
+		ensureRoundUpSplit(txId, db);
+		ensureRoundUpSplit(txId, db);
+
+		const splits = db.prepare(`SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 1`).all(txId);
+		expect(splits).toHaveLength(1);
+	});
+
+	it('round-up split is hidden from getSplitsWithStatus', () => {
+		const txId = seedTransaction(db, accountId, { amount: '4.75' });
+		ensureDefaultSplit(txId, db);
+
+		const splits = getSplitsWithStatus(txId, db);
+		expect(splits.every(s => !s.is_round_up)).toBe(true);
+		// Only the normal split (4.75) is visible
+		expect(splits).toHaveLength(1);
+		expect(splits[0].amount).toBe('4.75');
+	});
+});
+
+// ---------------------------------------------------------------------------
+// saveSplits with round-up account
+// ---------------------------------------------------------------------------
+
+describe('saveSplits with round_up enabled', () => {
+	beforeEach(() => {
+		db.prepare(`UPDATE accounts SET round_up = 1 WHERE id = ?`).run(accountId);
+	});
+
+	it('preserves the round-up split when user redefines splits', () => {
+		const txId = seedTransaction(db, accountId, { amount: '18.75' });
+		ensureDefaultSplit(txId, db);
+
+		// User defines 2 splits that sum to transaction amount
+		saveSplits(txId, [{ amount: '10.00' }, { amount: '8.75' }], db);
+
+		const userSplits = db.prepare(`SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 0 ORDER BY sort_order`).all(txId) as Array<{ amount: string }>;
+		expect(userSplits).toHaveLength(2);
+		expect(userSplits[0].amount).toBe('10.00');
+		expect(userSplits[1].amount).toBe('8.75');
+
+		const roundUpSplits = db.prepare(`SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 1`).all(txId) as Array<{ amount: string }>;
+		expect(roundUpSplits).toHaveLength(1);
+		expect(roundUpSplits[0].amount).toBe('0.25');
+	});
+
+	it('round-up split auto-allocation means transaction is not prematurely excluded from queue', () => {
+		const txId = seedTransaction(db, accountId, { amount: '4.75' });
+		ensureDefaultSplit(txId, db);
+
+		// The round-up split is auto-allocated but the normal split is not
+		const txs = getUnallocatedTransactions(accountId, db);
+		expect(txs.some(t => t.id === txId)).toBe(true);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// resetSplits with round-up account
+// ---------------------------------------------------------------------------
+
+describe('resetSplits with round_up enabled', () => {
+	it('re-creates the round-up split after reset', () => {
+		db.prepare(`UPDATE accounts SET round_up = 1 WHERE id = ?`).run(accountId);
+		const txId = seedTransaction(db, accountId, { amount: '9.50' });
+		saveSplits(txId, [{ amount: '5.00' }, { amount: '4.50' }], db);
+
+		resetSplits(txId, db);
+
+		const userSplits = db.prepare(`SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 0`).all(txId) as Array<{ amount: string }>;
+		expect(userSplits).toHaveLength(1);
+		expect(userSplits[0].amount).toBe('9.50');
+
+		const roundUpSplits = db.prepare(`SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 1`).all(txId) as Array<{ amount: string }>;
+		expect(roundUpSplits).toHaveLength(1);
+		expect(roundUpSplits[0].amount).toBe('0.50');
+	});
+});
+
+// ---------------------------------------------------------------------------
+// setAccountRoundUp
+// ---------------------------------------------------------------------------
+
+describe('setAccountRoundUp', () => {
+	it('enabling creates the Round Up envelope', () => {
+		setAccountRoundUp(accountId, true, db);
+		const envelope = db.prepare(`SELECT name FROM envelopes WHERE account_id = ? AND name = ?`).get(accountId, ROUND_UP_ENVELOPE_NAME);
+		expect(envelope).toBeTruthy();
+	});
+
+	it('enabling back-fills round-up splits for existing DBIT transactions', () => {
+		const txId = seedTransaction(db, accountId, { amount: '7.30' });
+		ensureDefaultSplit(txId, db);
+
+		setAccountRoundUp(accountId, true, db);
+
+		const roundUpSplits = db.prepare(`SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 1`).all(txId) as Array<{ amount: string }>;
+		expect(roundUpSplits).toHaveLength(1);
+		expect(roundUpSplits[0].amount).toBe('0.70');
+	});
+
+	it('disabling sets round_up flag to 0', () => {
+		setAccountRoundUp(accountId, true, db);
+		setAccountRoundUp(accountId, false, db);
+		const row = db.prepare(`SELECT round_up FROM accounts WHERE id = ?`).get(accountId) as { round_up: number };
+		expect(row.round_up).toBe(0);
 	});
 });
