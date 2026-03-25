@@ -7,3 +7,5 @@ __pycache__/
 .env
 transactions.db-shm
 transactions.db-wal
+web/tests/fixture.db-shm
+web/tests/fixture.db-wal
