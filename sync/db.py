@@ -221,6 +221,26 @@ def ensure_default_split(conn: sqlite3.Connection, tx_id: int) -> None:
     conn.commit()
 
 
+ROUND_UP_ENVELOPE_NAME = "Round Up"
+
+
+def get_or_create_round_up_envelope(conn: sqlite3.Connection, account_id: int) -> int:
+    """Return the id of the Round Up envelope for the account, creating it if needed."""
+    existing = conn.execute(
+        "SELECT id FROM envelopes WHERE account_id = ? AND name = ?",
+        (account_id, ROUND_UP_ENVELOPE_NAME),
+    ).fetchone()
+    if existing:
+        return existing["id"]
+
+    cursor = conn.execute(
+        "INSERT INTO envelopes (account_id, name) VALUES (?, ?)",
+        (account_id, ROUND_UP_ENVELOPE_NAME),
+    )
+    conn.commit()
+    return cursor.lastrowid
+
+
 def get_transactions_for_account(
     conn: sqlite3.Connection,
     account_id: int,
