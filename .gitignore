@@ -5,3 +5,5 @@ __pycache__/
 *.db
 *.pem
 .env
+transactions.db-shm
+transactions.db-wal
