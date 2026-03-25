@@ -85,6 +85,9 @@ def _row_to_account(row: sqlite3.Row) -> Account:
         last_synced_at=(
             datetime.fromisoformat(row["last_synced_at"]) if row["last_synced_at"] else None
         ),
+        round_up_since=(
+            date.fromisoformat(row["round_up_since"]) if row["round_up_since"] else None
+        ),
     )
 
 

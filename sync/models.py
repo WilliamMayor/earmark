@@ -20,6 +20,7 @@ class Account:
     name: Optional[str] = None
     institution_name: Optional[str] = None
     last_synced_at: Optional[datetime] = None
+    round_up_since: Optional[date] = None
     id: Optional[int] = None
 
 
