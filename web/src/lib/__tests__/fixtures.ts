@@ -21,26 +21,18 @@ export function createTestDb(): Database.Database {
 }
 
 interface SeedOptions {
-	aspspName?: string;
+	institutionName?: string;
 	accountName?: string;
 	currency?: string;
 }
 
 export function seedAccount(db: Database.Database, opts: SeedOptions = {}): number {
-	const { aspspName = 'Monzo', accountName = 'Personal', currency = 'GBP' } = opts;
-
-	// Insert a minimal session first
-	db.prepare(
-		`INSERT INTO sessions (session_id, aspsp_name, psu_type, valid_until, created_at)
-		 VALUES ('test-session', ?, 'personal', '2099-01-01', datetime('now'))`
-	).run(aspspName);
-
-	const sessionId = (db.prepare(`SELECT last_insert_rowid() AS id`).get() as { id: number }).id;
+	const { institutionName = 'Monzo', accountName = 'Personal', currency = 'GBP' } = opts;
 
 	db.prepare(
-		`INSERT INTO accounts (session_id, account_uid, aspsp_name, name, currency)
-		 VALUES (?, ?, ?, ?, ?)`
-	).run(sessionId, `uid-${Date.now()}-${Math.random()}`, aspspName, accountName, currency);
+		`INSERT INTO accounts (lunchflow_id, institution_name, name, currency)
+		 VALUES (?, ?, ?, ?)`
+	).run(Date.now(), institutionName, accountName, currency);
 
 	return (db.prepare(`SELECT last_insert_rowid() AS id`).get() as { id: number }).id;
 }
@@ -48,9 +40,9 @@ export function seedAccount(db: Database.Database, opts: SeedOptions = {}): numb
 interface TxOptions {
 	amount?: string;
 	creditDebit?: 'DBIT' | 'CRDT';
-	status?: 'booked' | 'pending' | 'unconfirmed' | 'opening_balance';
-	bookingDate?: string;
-	payee?: string;
+	status?: 'booked' | 'pending' | 'opening_balance';
+	date?: string;
+	merchant?: string;
 }
 
 export function seedTransaction(
@@ -62,14 +54,14 @@ export function seedTransaction(
 		amount = '10.00',
 		creditDebit = 'DBIT',
 		status = 'booked',
-		bookingDate = '2026-03-01',
-		payee = 'Test Payee'
+		date = '2026-03-01',
+		merchant = 'Test Merchant'
 	} = opts;
 
 	db.prepare(
-		`INSERT INTO transactions (account_id, booking_date, amount, currency, credit_debit_indicator, status, payee)
+		`INSERT INTO transactions (account_id, date, amount, currency, credit_debit_indicator, status, merchant)
 		 VALUES (?, ?, ?, 'GBP', ?, ?, ?)`
-	).run(accountId, bookingDate, amount, creditDebit, status, payee);
+	).run(accountId, date, amount, creditDebit, status, merchant);
 
 	return (db.prepare(`SELECT last_insert_rowid() AS id`).get() as { id: number }).id;
 }

@@ -1,8 +1,7 @@
 export interface Account {
 	id: number;
-	session_id: number;
-	account_uid: string;
-	aspsp_name: string;
+	lunchflow_id: number;
+	institution_name: string;
 	name: string | null;
 	currency: string;
 	last_synced_at: string | null;
@@ -15,15 +14,14 @@ export interface AccountWithStats extends Account {
 export interface Transaction {
 	id: number;
 	account_id: number;
-	entry_reference: string | null;
-	booking_date: string | null;
-	value_date: string | null;
+	lunchflow_id: string | null;
+	date: string | null;
 	amount: string;
 	currency: string;
 	credit_debit_indicator: 'CRDT' | 'DBIT';
-	status: 'booked' | 'pending' | 'unconfirmed' | 'opening_balance';
-	payee: string | null;
-	remittance_information: string | null;
+	status: 'booked' | 'pending' | 'opening_balance';
+	merchant: string | null;
+	description: string | null;
 	note: string | null;
 }
 

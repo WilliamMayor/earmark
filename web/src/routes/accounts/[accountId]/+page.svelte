@@ -44,11 +44,11 @@
 		renameValue = '';
 	}
 
-	const { account } = data;
+	const account = $derived(data.account);
 </script>
 
 <svelte:head>
-	<title>{account.name ?? account.aspsp_name} — Budget</title>
+	<title>{account.name ?? account.institution_name} — Budget</title>
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50 flex flex-col">
@@ -60,8 +60,8 @@
 			</svg>
 		</a>
 		<div>
-			<h1 class="text-xl font-semibold text-gray-900">{account.name ?? account.aspsp_name}</h1>
-			<p class="text-xs text-gray-400">{account.aspsp_name} · {account.currency}</p>
+			<h1 class="text-xl font-semibold text-gray-900">{account.name ?? account.institution_name}</h1>
+			<p class="text-xs text-gray-400">{account.institution_name} · {account.currency}</p>
 		</div>
 	</header>
 
@@ -86,6 +86,7 @@
 				<label class="block text-sm font-medium text-gray-700 mb-1" for="new-envelope-name">
 					Envelope name
 				</label>
+				<!-- svelte-ignore a11y_autofocus -->
 				<input
 					id="new-envelope-name"
 					name="name"
@@ -94,7 +95,7 @@
 					class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
 					placeholder="e.g. Groceries"
 					required
-					autofocus
+							autofocus
 				/>
 				<div class="flex gap-2 mt-3">
 					<button
@@ -133,6 +134,7 @@
 						use:enhance={() => ({ update }) => { update(); cancelRename(); }}
 					>
 						<input type="hidden" name="envelope_id" value={envelope.id} />
+						<!-- svelte-ignore a11y_autofocus -->
 						<input
 							name="name"
 							type="text"
@@ -220,6 +222,8 @@
 		{@const unallocatedSplits = splits.filter(s => !s.is_allocated)}
 
 		<div
+			role="region"
+			aria-label="Transaction allocation"
 			class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg max-w-lg mx-auto"
 			ontouchstart={handleTouchStart}
 			ontouchend={handleTouchEnd}
@@ -261,11 +265,11 @@
 			<div class="px-4 pb-4">
 				<div class="flex items-start justify-between mb-1">
 					<div class="flex-1 min-w-0">
-						<p class="font-semibold text-gray-900 truncate">{tx.payee ?? 'Unknown payee'}</p>
-						{#if tx.remittance_information}
-							<p class="text-xs text-gray-400 truncate">{tx.remittance_information}</p>
+						<p class="font-semibold text-gray-900 truncate">{tx.merchant ?? 'Unknown merchant'}</p>
+						{#if tx.description}
+							<p class="text-xs text-gray-400 truncate">{tx.description}</p>
 						{/if}
-						<p class="text-xs text-gray-400">{formatDate(tx.booking_date)}</p>
+						<p class="text-xs text-gray-400">{formatDate(tx.date)}</p>
 					</div>
 					<div class="text-right ml-4 shrink-0">
 						<p class="font-bold text-gray-900">{formatCurrency(tx.amount, tx.currency)}</p>

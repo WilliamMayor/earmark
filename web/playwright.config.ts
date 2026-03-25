@@ -3,13 +3,15 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
 	testDir: './tests',
 	globalSetup: './tests/global-setup.ts',
+	workers: 1,
 	webServer: {
 		command: 'npm run build && DB_PATH=./tests/fixture.db node build/index.js',
 		port: 3000,
 		reuseExistingServer: !process.env.CI,
 		env: {
 			DB_PATH: './tests/fixture.db',
-			PORT: '3000'
+			PORT: '3000',
+			ORIGIN: 'http://localhost:3000'
 		}
 	},
 	use: {

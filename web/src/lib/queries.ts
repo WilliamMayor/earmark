@@ -39,7 +39,7 @@ export function getAccounts(db: Database.Database = getDb()): AccountWithStats[]
 		FROM accounts a
 		LEFT JOIN transactions t ON t.account_id = a.id
 		GROUP BY a.id
-		ORDER BY a.aspsp_name, a.name
+		ORDER BY a.institution_name, a.name
 	`
 		)
 		.all() as AccountWithStats[];
@@ -324,7 +324,7 @@ export function getUnallocatedTransactions(
 		          AND NOT EXISTS (SELECT 1 FROM allocations al WHERE al.split_id = s2.id)
 		      )
 		  )
-		ORDER BY t.booking_date ASC, t.id ASC
+		ORDER BY t.date ASC, t.id ASC
 	`
 		)
 		.all(accountId) as Transaction[];

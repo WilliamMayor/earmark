@@ -25,7 +25,7 @@
 				>
 					<div class="flex items-start justify-between">
 						<div>
-							<p class="font-medium text-gray-900">{account.aspsp_name}</p>
+							<p class="font-medium text-gray-900">{account.institution_name}</p>
 							{#if account.name}
 								<p class="text-sm text-gray-500">{account.name}</p>
 							{/if}

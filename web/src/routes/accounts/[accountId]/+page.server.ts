@@ -1,4 +1,5 @@
 import { error, fail, redirect } from '@sveltejs/kit';
+import { getDb } from '$lib/db.js';
 import {
 	getEnvelopes,
 	getUnallocatedTransactions,
@@ -44,6 +45,16 @@ export const actions = {
 		} catch (err) {
 			if (err instanceof AlreadyAllocatedError) return fail(409, { error: err.message });
 			throw err;
+		}
+
+		// If the transaction still has unallocated splits, return to the split page
+		const db = getDb();
+		const row = db.prepare(`SELECT transaction_id FROM splits WHERE id = ?`).get(splitId) as { transaction_id: number } | null;
+		if (row) {
+			const remaining = getSplitsWithStatus(row.transaction_id, db);
+			if (remaining.some((s) => !s.is_allocated)) {
+				redirect(303, `/accounts/${accountId}/split?tx=${row.transaction_id}`);
+			}
 		}
 
 		// Work out where to redirect: stay at same index (now points to next tx)

@@ -1,10 +1,11 @@
 import Database from 'better-sqlite3';
+import { env } from '$env/dynamic/private';
 
 let _db: Database.Database | null = null;
 
 export function getDb(): Database.Database {
 	if (!_db) {
-		const path = process.env.DB_PATH;
+		const path = env.DB_PATH;
 		if (!path) throw new Error('DB_PATH environment variable is not set');
 		_db = new Database(path);
 		_db.pragma('foreign_keys = ON');

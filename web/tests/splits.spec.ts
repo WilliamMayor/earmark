@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { resetFixtureDb } from './helpers/seed.js';
+
+test.beforeEach(() => resetFixtureDb());
 
 async function getSplitUrl(page: import('@playwright/test').Page): Promise<string> {
 	// Navigate to account and go to the pre-split transaction (tx3: Waitrose £20.00)

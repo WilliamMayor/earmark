@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { formatCurrency, formatDate, sumAmounts, amountsMatch } from '$lib/format.js';
 
@@ -7,12 +8,14 @@
 	const { transaction: tx, splits, mode } = $derived(data);
 	const { account } = $derived(data);
 
-	// Split definition state
+	// Split definition state — initialised once from server data on page load
 	interface Part { amount: string; note: string }
 	let parts = $state<Part[]>(
-		mode === 'define'
-			? [{ amount: '', note: '' }, { amount: '', note: '' }]
-			: splits.map((s) => ({ amount: s.amount, note: s.note ?? '' }))
+		untrack(() =>
+			data.mode === 'define'
+				? [{ amount: '', note: '' }, { amount: '', note: '' }]
+				: data.splits.map((s) => ({ amount: s.amount, note: s.note ?? '' }))
+		)
 	);
 
 	const partSum = $derived(
@@ -51,7 +54,7 @@
 		</a>
 		<div>
 			<h1 class="text-xl font-semibold text-gray-900">Split transaction</h1>
-			<p class="text-sm text-gray-500">{tx.payee ?? 'Unknown payee'}</p>
+			<p class="text-sm text-gray-500">{tx.merchant ?? 'Unknown merchant'}</p>
 		</div>
 	</header>
 
@@ -59,8 +62,8 @@
 	<div class="bg-white border-b border-gray-100 px-4 py-3 max-w-lg mx-auto">
 		<div class="flex justify-between items-center">
 			<div>
-				<p class="font-semibold text-gray-900">{tx.payee ?? 'Unknown payee'}</p>
-				<p class="text-xs text-gray-400">{formatDate(tx.booking_date)}</p>
+				<p class="font-semibold text-gray-900">{tx.merchant ?? 'Unknown merchant'}</p>
+				<p class="text-xs text-gray-400">{formatDate(tx.date)}</p>
 			</div>
 			<p class="font-bold text-gray-900 text-lg">{formatCurrency(tx.amount, tx.currency)}</p>
 		</div>
@@ -101,9 +104,8 @@
 									<input
 										id="amount-{i}"
 										name="amount"
-										type="number"
-										step="0.01"
-										min="0.01"
+										type="text"
+										inputmode="decimal"
 										bind:value={part.amount}
 										class="w-full border border-gray-300 rounded-lg pl-6 pr-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
 										required
@@ -152,14 +154,13 @@
 					>
 						Save split
 					</button>
-					<form method="POST" action="?/cancel&tx={tx.id}" use:enhance class="flex-1">
-						<button
-							type="submit"
-							class="w-full bg-gray-100 text-gray-700 text-sm font-medium rounded-xl py-3 hover:bg-gray-200"
-						>
-							Cancel
-						</button>
-					</form>
+					<button
+						type="submit"
+						formaction="?/cancel&tx={tx.id}"
+						class="flex-1 bg-gray-100 text-gray-700 text-sm font-medium rounded-xl py-3 hover:bg-gray-200"
+					>
+						Cancel
+					</button>
 				</div>
 			</form>
 
@@ -198,8 +199,8 @@
 				{/each}
 
 				<!-- Envelope allocation buttons (shown for first unallocated split) -->
-				{@const unallocatedSplit = splits.find((s) => !s.is_allocated)}
-				{#if unallocatedSplit}
+				{#if splits.find((s) => !s.is_allocated)}
+					{@const unallocatedSplit = splits.find((s) => !s.is_allocated)}
 					<div class="pt-2">
 						<p class="text-xs text-gray-500 mb-2">
 							Allocate {formatCurrency(unallocatedSplit.amount, tx.currency)} to:

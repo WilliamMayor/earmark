@@ -1,6 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { getDb } from '$lib/db.js';
-import { getSplitsWithStatus, saveSplits, resetSplits, getUnallocatedTransactions } from '$lib/queries.js';
+import { getEnvelopes, getSplitsWithStatus, saveSplits, resetSplits, getUnallocatedTransactions } from '$lib/queries.js';
 import { SplitValidationError } from '$lib/types.js';
 
 export function load({ params, url }) {
@@ -17,13 +17,13 @@ export function load({ params, url }) {
 		| {
 				id: number;
 				account_id: number;
-				booking_date: string | null;
+				date: string | null;
 				amount: string;
 				currency: string;
 				credit_debit_indicator: string;
 				status: string;
-				payee: string | null;
-				remittance_information: string | null;
+				merchant: string | null;
+				description: string | null;
 				note: string | null;
 		  }
 		| undefined;
@@ -33,8 +33,9 @@ export function load({ params, url }) {
 	const splits = getSplitsWithStatus(txId);
 	// 'define' if only one split (the default), 'allocate' if user has already defined parts
 	const mode = splits.length > 1 ? 'allocate' : 'define';
+	const envelopes = getEnvelopes(accountId);
 
-	return { transaction: tx, splits, mode };
+	return { transaction: tx, splits, mode, envelopes };
 }
 
 export const actions = {

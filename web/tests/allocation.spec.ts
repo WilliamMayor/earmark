@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { resetFixtureDb } from './helpers/seed.js';
+
+test.beforeEach(() => resetFixtureDb());
 
 async function getAccountUrl(page: import('@playwright/test').Page): Promise<string> {
 	await page.goto('/accounts');
@@ -50,11 +53,13 @@ test.describe('Allocation flow', () => {
 		await page.getByTestId('allocate-btn').first().click();
 		await page.waitForURL(/\?tx=/);
 
-		// tx3 is a split — allocate both parts
+		// tx3 is a split — allocating part 1 redirects to the split page
 		await page.getByTestId('allocate-btn').first().click();
-		await page.waitForURL(/\?tx=/);
-		await page.getByTestId('allocate-btn').first().click();
-		await page.waitForURL(/accounts\/\d+/);
+		await page.waitForURL(/\/split\?tx=/);
+
+		// Allocate part 2 from the split page, then redirects back to account
+		await page.getByTestId('split-allocate-btn').first().click();
+		await page.waitForURL(/accounts\/\d+(?!.*split)/);
 
 		// All done — no dock
 		await expect(page.getByTestId('allocation-dock')).not.toBeVisible();

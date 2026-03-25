@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { resetFixtureDb } from './helpers/seed.js';
+
+test.beforeEach(() => resetFixtureDb());
 
 test.describe('Account list', () => {
 	test('shows accounts page at root redirect', async ({ page }) => {

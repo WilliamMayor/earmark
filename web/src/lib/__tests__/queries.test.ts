@@ -175,8 +175,7 @@ describe('getUnallocatedTransactions', () => {
 		expect(txs).toHaveLength(0);
 	});
 
-	it('excludes unconfirmed and opening_balance statuses', () => {
-		seedTransaction(db, accountId, { amount: '10.00', status: 'unconfirmed' });
+	it('excludes opening_balance status', () => {
 		seedTransaction(db, accountId, { amount: '10.00', status: 'opening_balance' });
 		const txs = getUnallocatedTransactions(accountId, db);
 		expect(txs).toHaveLength(0);
