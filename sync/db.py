@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import sqlite3
 from datetime import date, datetime
 from decimal import Decimal
@@ -239,6 +240,62 @@ def get_or_create_round_up_envelope(conn: sqlite3.Connection, account_id: int) -
     )
     conn.commit()
     return cursor.lastrowid
+
+
+def ensure_round_up_split(conn: sqlite3.Connection, tx_id: int) -> None:
+    """
+    Create a round-up split for a DBIT transaction when round-up is enabled
+    and the transaction date is on or after round_up_since. Idempotent.
+    """
+    row = conn.execute(
+        """SELECT t.amount, t.credit_debit_indicator, t.date, t.account_id,
+                  a.round_up_since
+           FROM transactions t
+           JOIN accounts a ON a.id = t.account_id
+           WHERE t.id = ?""",
+        (tx_id,),
+    ).fetchone()
+
+    if not row:
+        return
+    if not row["round_up_since"]:
+        return
+    if row["credit_debit_indicator"] != "DBIT":
+        return
+    if not row["date"]:
+        return
+
+    tx_date = date.fromisoformat(row["date"])
+    round_up_since = date.fromisoformat(row["round_up_since"])
+    if tx_date < round_up_since:
+        return
+
+    minor_units = int(Decimal(row["amount"]) * 100)
+    rounded_up = math.ceil(minor_units / 100) * 100
+    round_up_minor = rounded_up - minor_units
+
+    if round_up_minor == 0:
+        return
+
+    existing = conn.execute(
+        "SELECT id FROM splits WHERE transaction_id = ? AND is_round_up = 1", (tx_id,)
+    ).fetchone()
+    if existing:
+        return
+
+    round_up_amount = str((Decimal(round_up_minor) / 100).quantize(Decimal("0.01")))
+    cursor = conn.execute(
+        "INSERT INTO splits (transaction_id, amount, sort_order, is_round_up) VALUES (?, ?, 999, 1)",
+        (tx_id, round_up_amount),
+    )
+    conn.commit()
+
+    envelope_id = get_or_create_round_up_envelope(conn, row["account_id"])
+    conn.execute(
+        "INSERT INTO allocations (envelope_id, split_id) VALUES (?, ?)",
+        (envelope_id, cursor.lastrowid),
+    )
+    conn.commit()
 
 
 def get_transactions_for_account(

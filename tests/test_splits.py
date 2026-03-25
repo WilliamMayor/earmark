@@ -1,8 +1,10 @@
 """Tests for split management functions in sync/db.py."""
 
+from datetime import date
 from decimal import Decimal
 from sync.db import (
     ensure_default_split,
+    ensure_round_up_split,
     get_or_create_round_up_envelope,
     insert_transaction,
     upsert_account,
@@ -76,3 +78,113 @@ def test_get_or_create_round_up_envelope_separate_per_account(db_conn, saved_acc
     id1 = get_or_create_round_up_envelope(db_conn, saved_account.id)
     id2 = get_or_create_round_up_envelope(db_conn, second.id)
     assert id1 != id2
+
+
+def _enable_round_up(db_conn, account_id, since="2025-01-01"):
+    db_conn.execute(
+        "UPDATE accounts SET round_up_since = ? WHERE id = ?", (since, account_id)
+    )
+    db_conn.commit()
+
+
+def test_ensure_round_up_split_creates_split_for_non_whole_dbit(db_conn, saved_account):
+    _enable_round_up(db_conn, saved_account.id, "2025-01-01")
+    tx = insert_transaction(db_conn, make_transaction(
+        saved_account.id, amount=Decimal("4.75"),
+        credit_debit_indicator="DBIT", date=date(2025, 6, 1)
+    ))
+    ensure_round_up_split(db_conn, tx.id)
+
+    row = db_conn.execute(
+        "SELECT amount FROM splits WHERE transaction_id = ? AND is_round_up = 1", (tx.id,)
+    ).fetchone()
+    assert row is not None
+    assert row["amount"] == "0.25"
+
+
+def test_ensure_round_up_split_auto_allocates_to_envelope(db_conn, saved_account):
+    _enable_round_up(db_conn, saved_account.id)
+    tx = insert_transaction(db_conn, make_transaction(
+        saved_account.id, amount=Decimal("4.75"),
+        credit_debit_indicator="DBIT", date=date(2025, 6, 1)
+    ))
+    ensure_round_up_split(db_conn, tx.id)
+
+    split = db_conn.execute(
+        "SELECT id FROM splits WHERE transaction_id = ? AND is_round_up = 1", (tx.id,)
+    ).fetchone()
+    alloc = db_conn.execute(
+        "SELECT * FROM allocations WHERE split_id = ?", (split["id"],)
+    ).fetchone()
+    assert alloc is not None
+
+
+def test_ensure_round_up_split_skips_whole_amount(db_conn, saved_account):
+    _enable_round_up(db_conn, saved_account.id)
+    tx = insert_transaction(db_conn, make_transaction(
+        saved_account.id, amount=Decimal("5.00"),
+        credit_debit_indicator="DBIT", date=date(2025, 6, 1)
+    ))
+    ensure_round_up_split(db_conn, tx.id)
+
+    row = db_conn.execute(
+        "SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 1", (tx.id,)
+    ).fetchone()
+    assert row is None
+
+
+def test_ensure_round_up_split_skips_crdt(db_conn, saved_account):
+    _enable_round_up(db_conn, saved_account.id)
+    tx = insert_transaction(db_conn, make_transaction(
+        saved_account.id, amount=Decimal("4.75"),
+        credit_debit_indicator="CRDT", date=date(2025, 6, 1)
+    ))
+    ensure_round_up_split(db_conn, tx.id)
+
+    row = db_conn.execute(
+        "SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 1", (tx.id,)
+    ).fetchone()
+    assert row is None
+
+
+def test_ensure_round_up_split_respects_date_gate(db_conn, saved_account):
+    _enable_round_up(db_conn, saved_account.id, since="2025-07-01")
+    tx = insert_transaction(db_conn, make_transaction(
+        saved_account.id, amount=Decimal("4.75"),
+        credit_debit_indicator="DBIT", date=date(2025, 6, 1)
+    ))
+    ensure_round_up_split(db_conn, tx.id)
+
+    row = db_conn.execute(
+        "SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 1", (tx.id,)
+    ).fetchone()
+    assert row is None
+
+
+def test_ensure_round_up_split_skips_when_disabled(db_conn, saved_account):
+    tx = insert_transaction(db_conn, make_transaction(
+        saved_account.id, amount=Decimal("4.75"),
+        credit_debit_indicator="DBIT", date=date(2025, 6, 1)
+    ))
+    ensure_round_up_split(db_conn, tx.id)
+
+    row = db_conn.execute(
+        "SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 1", (tx.id,)
+    ).fetchone()
+    assert row is None
+
+
+def test_ensure_round_up_split_is_idempotent(db_conn, saved_account):
+    _enable_round_up(db_conn, saved_account.id)
+    tx = insert_transaction(db_conn, make_transaction(
+        saved_account.id, amount=Decimal("4.75"),
+        credit_debit_indicator="DBIT", date=date(2025, 6, 1)
+    ))
+    ensure_round_up_split(db_conn, tx.id)
+    ensure_round_up_split(db_conn, tx.id)
+    ensure_round_up_split(db_conn, tx.id)
+
+    rows = db_conn.execute(
+        "SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 1", (tx.id,)
+    ).fetchall()
+    assert len(rows) == 1
