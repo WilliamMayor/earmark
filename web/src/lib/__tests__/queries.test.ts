@@ -351,8 +351,8 @@ describe('getOrCreateRoundUpEnvelope', () => {
 	it('creates separate envelopes for different accounts', () => {
 		// Insert a second account directly to avoid session_id collision in seedAccount
 		db.prepare(
-			`INSERT INTO accounts (session_id, account_uid, aspsp_name, name, currency)
-			 VALUES (1, 'uid-second', 'Barclays', 'Current', 'GBP')`
+			`INSERT INTO accounts (lunchflow_id, institution_name, name, currency)
+			 VALUES (2, 'Barclays', 'Current', 'GBP')`
 		).run();
 		const accountId2 = (db.prepare(`SELECT last_insert_rowid() AS id`).get() as { id: number }).id;
 		const id1 = getOrCreateRoundUpEnvelope(accountId, db);

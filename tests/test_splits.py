@@ -17,7 +17,7 @@ ROUND_UP_ENVELOPE_NAME = "Round Up"
 
 def test_ensure_default_split_creates_split(db_conn, saved_account):
     tx = insert_transaction(db_conn, make_transaction(saved_account.id, amount=Decimal("18.50")))
-    ensure_default_split(db_conn, tx.id)
+    ensure_default_split(db_conn, tx.id)  # type: ignore[arg-type]
 
     row = db_conn.execute(
         "SELECT * FROM splits WHERE transaction_id = ?", (tx.id,)
@@ -29,9 +29,9 @@ def test_ensure_default_split_creates_split(db_conn, saved_account):
 
 def test_ensure_default_split_is_idempotent(db_conn, saved_account):
     tx = insert_transaction(db_conn, make_transaction(saved_account.id))
-    ensure_default_split(db_conn, tx.id)
-    ensure_default_split(db_conn, tx.id)
-    ensure_default_split(db_conn, tx.id)
+    ensure_default_split(db_conn, tx.id)  # type: ignore[arg-type]
+    ensure_default_split(db_conn, tx.id)  # type: ignore[arg-type]
+    ensure_default_split(db_conn, tx.id)  # type: ignore[arg-type]
 
     rows = db_conn.execute(
         "SELECT * FROM splits WHERE transaction_id = ?", (tx.id,)
@@ -51,7 +51,7 @@ def test_ensure_default_split_does_not_overwrite_existing(db_conn, saved_account
     )
     db_conn.commit()
 
-    ensure_default_split(db_conn, tx.id)
+    ensure_default_split(db_conn, tx.id)  # type: ignore[arg-type]
 
     rows = db_conn.execute(
         "SELECT * FROM splits WHERE transaction_id = ?", (tx.id,)
@@ -60,7 +60,7 @@ def test_ensure_default_split_does_not_overwrite_existing(db_conn, saved_account
 
 
 def test_get_or_create_round_up_envelope_creates_envelope(db_conn, saved_account):
-    envelope_id = get_or_create_round_up_envelope(db_conn, saved_account.id)
+    envelope_id = get_or_create_round_up_envelope(db_conn, saved_account.id)  # type: ignore[arg-type]
     row = db_conn.execute(
         "SELECT name FROM envelopes WHERE id = ?", (envelope_id,)
     ).fetchone()
@@ -68,15 +68,15 @@ def test_get_or_create_round_up_envelope_creates_envelope(db_conn, saved_account
 
 
 def test_get_or_create_round_up_envelope_is_idempotent(db_conn, saved_account):
-    id1 = get_or_create_round_up_envelope(db_conn, saved_account.id)
-    id2 = get_or_create_round_up_envelope(db_conn, saved_account.id)
+    id1 = get_or_create_round_up_envelope(db_conn, saved_account.id)  # type: ignore[arg-type]
+    id2 = get_or_create_round_up_envelope(db_conn, saved_account.id)  # type: ignore[arg-type]
     assert id1 == id2
 
 
 def test_get_or_create_round_up_envelope_separate_per_account(db_conn, saved_account):
     second = upsert_account(db_conn, Account(lunchflow_id=9999, currency="GBP", name="Second"))
-    id1 = get_or_create_round_up_envelope(db_conn, saved_account.id)
-    id2 = get_or_create_round_up_envelope(db_conn, second.id)
+    id1 = get_or_create_round_up_envelope(db_conn, saved_account.id)  # type: ignore[arg-type]
+    id2 = get_or_create_round_up_envelope(db_conn, second.id)  # type: ignore[arg-type]
     assert id1 != id2
 
 
@@ -93,7 +93,7 @@ def test_ensure_round_up_split_creates_split_for_non_whole_dbit(db_conn, saved_a
         saved_account.id, amount=Decimal("4.75"),
         credit_debit_indicator="DBIT", date=date(2025, 6, 1)
     ))
-    ensure_round_up_split(db_conn, tx.id)
+    ensure_round_up_split(db_conn, tx.id)  # type: ignore[arg-type]
 
     row = db_conn.execute(
         "SELECT amount FROM splits WHERE transaction_id = ? AND is_round_up = 1", (tx.id,)
@@ -108,7 +108,7 @@ def test_ensure_round_up_split_auto_allocates_to_envelope(db_conn, saved_account
         saved_account.id, amount=Decimal("4.75"),
         credit_debit_indicator="DBIT", date=date(2025, 6, 1)
     ))
-    ensure_round_up_split(db_conn, tx.id)
+    ensure_round_up_split(db_conn, tx.id)  # type: ignore[arg-type]
 
     split = db_conn.execute(
         "SELECT id FROM splits WHERE transaction_id = ? AND is_round_up = 1", (tx.id,)
@@ -125,7 +125,7 @@ def test_ensure_round_up_split_skips_whole_amount(db_conn, saved_account):
         saved_account.id, amount=Decimal("5.00"),
         credit_debit_indicator="DBIT", date=date(2025, 6, 1)
     ))
-    ensure_round_up_split(db_conn, tx.id)
+    ensure_round_up_split(db_conn, tx.id)  # type: ignore[arg-type]
 
     row = db_conn.execute(
         "SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 1", (tx.id,)
@@ -139,7 +139,7 @@ def test_ensure_round_up_split_skips_crdt(db_conn, saved_account):
         saved_account.id, amount=Decimal("4.75"),
         credit_debit_indicator="CRDT", date=date(2025, 6, 1)
     ))
-    ensure_round_up_split(db_conn, tx.id)
+    ensure_round_up_split(db_conn, tx.id)  # type: ignore[arg-type]
 
     row = db_conn.execute(
         "SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 1", (tx.id,)
@@ -153,7 +153,7 @@ def test_ensure_round_up_split_respects_date_gate(db_conn, saved_account):
         saved_account.id, amount=Decimal("4.75"),
         credit_debit_indicator="DBIT", date=date(2025, 6, 1)
     ))
-    ensure_round_up_split(db_conn, tx.id)
+    ensure_round_up_split(db_conn, tx.id)  # type: ignore[arg-type]
 
     row = db_conn.execute(
         "SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 1", (tx.id,)
@@ -166,7 +166,7 @@ def test_ensure_round_up_split_skips_when_disabled(db_conn, saved_account):
         saved_account.id, amount=Decimal("4.75"),
         credit_debit_indicator="DBIT", date=date(2025, 6, 1)
     ))
-    ensure_round_up_split(db_conn, tx.id)
+    ensure_round_up_split(db_conn, tx.id)  # type: ignore[arg-type]
 
     row = db_conn.execute(
         "SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 1", (tx.id,)
@@ -180,9 +180,9 @@ def test_ensure_round_up_split_is_idempotent(db_conn, saved_account):
         saved_account.id, amount=Decimal("4.75"),
         credit_debit_indicator="DBIT", date=date(2025, 6, 1)
     ))
-    ensure_round_up_split(db_conn, tx.id)
-    ensure_round_up_split(db_conn, tx.id)
-    ensure_round_up_split(db_conn, tx.id)
+    ensure_round_up_split(db_conn, tx.id)  # type: ignore[arg-type]
+    ensure_round_up_split(db_conn, tx.id)  # type: ignore[arg-type]
+    ensure_round_up_split(db_conn, tx.id)  # type: ignore[arg-type]
 
     rows = db_conn.execute(
         "SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 1", (tx.id,)

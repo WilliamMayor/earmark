@@ -64,14 +64,16 @@ def sync_account(conn: sqlite3.Connection, client: object, account: Account) -> 
                         note="Opening balance adjustor — edit if incorrect.",
                     ),
                 )
+                assert saved_adjustor.id is not None
                 ensure_default_split(conn, saved_adjustor.id)
 
     # Upsert all transactions, binding to our internal account id.
     for tx in api_transactions:
         tx.account_id = account.id  # type: ignore[assignment]
         saved = upsert_transaction(conn, tx)
-        ensure_default_split(conn, saved.id)
-        ensure_round_up_split(conn, saved.id)
+        assert saved.id is not None
+        ensure_default_split(conn, saved.id)  # type: ignore[arg-type]
+        ensure_round_up_split(conn, saved.id)  # type: ignore[arg-type]
 
     now = datetime.now(timezone.utc)
     update_account_sync_info(conn, account.id, now)  # type: ignore[arg-type]

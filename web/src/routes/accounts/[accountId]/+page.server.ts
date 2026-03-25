@@ -1,6 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { getDb } from '$lib/db.js';
 import {
+	getAccount,
 	getEnvelopes,
 	getUnallocatedTransactions,
 	createEnvelope,
@@ -15,6 +16,9 @@ import { AlreadyAllocatedError, EnvelopeHasAllocationsError } from '$lib/types.j
 export function load({ params, url }) {
 	const accountId = parseInt(params.accountId, 10);
 
+	const account = getAccount(accountId);
+	if (!account) error(404, 'Account not found');
+
 	const envelopes = getEnvelopes(accountId);
 	const unallocated = getUnallocatedTransactions(accountId);
 	const mode = unallocated.length > 0 ? 'allocate' : 'clean';
@@ -28,7 +32,7 @@ export function load({ params, url }) {
 	const currentTx = unallocated[currentTxIndex] ?? null;
 	const currentSplits = currentTx ? getSplitsWithStatus(currentTx.id) : [];
 
-	return { envelopes, unallocated, mode, currentTxIndex, currentTx, currentSplits };
+	return { account, envelopes, unallocated, mode, currentTxIndex, currentTx, currentSplits };
 }
 
 export const actions = {
