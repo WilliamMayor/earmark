@@ -195,6 +195,32 @@ def has_opening_balance(conn: sqlite3.Connection, account_id: int) -> bool:
     return row is not None
 
 
+# ---------------------------------------------------------------------------
+# Splits
+# ---------------------------------------------------------------------------
+
+def ensure_default_split(conn: sqlite3.Connection, tx_id: int) -> None:
+    """Create the default split for a transaction if it doesn't exist. Idempotent."""
+    existing = conn.execute(
+        "SELECT COUNT(*) AS cnt FROM splits WHERE transaction_id = ? AND is_default = 1",
+        (tx_id,),
+    ).fetchone()
+    if existing["cnt"] > 0:
+        return
+
+    tx = conn.execute(
+        "SELECT amount FROM transactions WHERE id = ?", (tx_id,)
+    ).fetchone()
+    if not tx:
+        raise ValueError(f"Transaction {tx_id} not found")
+
+    conn.execute(
+        "INSERT INTO splits (transaction_id, amount, sort_order, is_default) VALUES (?, ?, 0, 1)",
+        (tx_id, tx["amount"]),
+    )
+    conn.commit()
+
+
 def get_transactions_for_account(
     conn: sqlite3.Connection,
     account_id: int,
