@@ -163,3 +163,71 @@ def test_sync_result_has_expected_keys(db_conn, saved_account):
     assert "lunchflow_id" in result
     assert "institution_name" in result
     assert "upserted" in result
+
+
+def test_sync_creates_default_split_for_each_transaction(db_conn, saved_account):
+    txs = [
+        _make_api_tx(saved_account.id, date(2025, 6, d), lunchflow_id=f"lf-{d}")
+        for d in range(1, 4)
+    ]
+    client = _make_client(txs, balance=Decimal("-30.00"))
+    sync_account(db_conn, client, saved_account)
+
+    for d in range(1, 4):
+        tx_row = db_conn.execute(
+            "SELECT id FROM transactions WHERE lunchflow_id = ?", (f"lf-{d}",)
+        ).fetchone()
+        split = db_conn.execute(
+            "SELECT * FROM splits WHERE transaction_id = ? AND is_default = 1",
+            (tx_row["id"],),
+        ).fetchone()
+        assert split is not None, f"No default split for lf-{d}"
+
+
+def test_sync_creates_round_up_split_when_enabled(db_conn, saved_account):
+    db_conn.execute(
+        "UPDATE accounts SET round_up_since = '2025-01-01' WHERE id = ?",
+        (saved_account.id,),
+    )
+    db_conn.commit()
+
+    tx = _make_api_tx(
+        saved_account.id, date(2025, 6, 1),
+        amount=Decimal("4.75"), cdi="DBIT", lunchflow_id="lf-roundup"
+    )
+    client = _make_client([tx], balance=Decimal("-4.75"))
+    sync_account(db_conn, client, saved_account)
+
+    tx_row = db_conn.execute(
+        "SELECT id FROM transactions WHERE lunchflow_id = 'lf-roundup'"
+    ).fetchone()
+    split = db_conn.execute(
+        "SELECT amount FROM splits WHERE transaction_id = ? AND is_round_up = 1",
+        (tx_row["id"],),
+    ).fetchone()
+    assert split is not None
+    assert split["amount"] == "0.25"
+
+
+def test_sync_no_round_up_split_before_enabled_date(db_conn, saved_account):
+    db_conn.execute(
+        "UPDATE accounts SET round_up_since = '2025-07-01' WHERE id = ?",
+        (saved_account.id,),
+    )
+    db_conn.commit()
+
+    tx = _make_api_tx(
+        saved_account.id, date(2025, 6, 1),
+        amount=Decimal("4.75"), cdi="DBIT", lunchflow_id="lf-before"
+    )
+    client = _make_client([tx], balance=Decimal("-4.75"))
+    sync_account(db_conn, client, saved_account)
+
+    tx_row = db_conn.execute(
+        "SELECT id FROM transactions WHERE lunchflow_id = 'lf-before'"
+    ).fetchone()
+    split = db_conn.execute(
+        "SELECT * FROM splits WHERE transaction_id = ? AND is_round_up = 1",
+        (tx_row["id"],),
+    ).fetchone()
+    assert split is None

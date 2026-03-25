@@ -18,6 +18,8 @@ from .db import (
     insert_transaction,
     update_account_sync_info,
     upsert_transaction,
+    ensure_default_split,
+    ensure_round_up_split,
 )
 from .models import Account, Transaction, TransactionStatus
 
@@ -50,7 +52,7 @@ def sync_account(conn: sqlite3.Connection, client: object, account: Account) -> 
                     cdi = "CRDT"
                     adj_amount = adjustor_signed
 
-                insert_transaction(
+                saved_adjustor = insert_transaction(
                     conn,
                     Transaction(
                         account_id=account.id,  # type: ignore[arg-type]
@@ -62,11 +64,14 @@ def sync_account(conn: sqlite3.Connection, client: object, account: Account) -> 
                         note="Opening balance adjustor — edit if incorrect.",
                     ),
                 )
+                ensure_default_split(conn, saved_adjustor.id)
 
     # Upsert all transactions, binding to our internal account id.
     for tx in api_transactions:
         tx.account_id = account.id  # type: ignore[assignment]
-        upsert_transaction(conn, tx)
+        saved = upsert_transaction(conn, tx)
+        ensure_default_split(conn, saved.id)
+        ensure_round_up_split(conn, saved.id)
 
     now = datetime.now(timezone.utc)
     update_account_sync_info(conn, account.id, now)  # type: ignore[arg-type]
