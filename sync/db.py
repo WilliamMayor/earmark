@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import sqlite3
 from datetime import date, datetime
 from decimal import Decimal
@@ -56,6 +55,7 @@ def upsert_account(conn: sqlite3.Connection, account: Account) -> Account:
         institution_name=account.institution_name,
         currency=account.currency,
         last_synced_at=account.last_synced_at,
+        round_up_since=account.round_up_since,
     )
 
 
@@ -239,6 +239,7 @@ def get_or_create_round_up_envelope(conn: sqlite3.Connection, account_id: int) -
         (account_id, ROUND_UP_ENVELOPE_NAME),
     )
     conn.commit()
+    assert cursor.lastrowid is not None
     return cursor.lastrowid
 
 
@@ -271,8 +272,8 @@ def ensure_round_up_split(conn: sqlite3.Connection, tx_id: int) -> None:
         return
 
     minor_units = int(Decimal(row["amount"]) * 100)
-    rounded_up = math.ceil(minor_units / 100) * 100
-    round_up_minor = rounded_up - minor_units
+    remainder = minor_units % 100
+    round_up_minor = (100 - remainder) % 100
 
     if round_up_minor == 0:
         return
@@ -288,12 +289,12 @@ def ensure_round_up_split(conn: sqlite3.Connection, tx_id: int) -> None:
         "INSERT INTO splits (transaction_id, amount, sort_order, is_round_up) VALUES (?, ?, 999, 1)",
         (tx_id, round_up_amount),
     )
-    conn.commit()
+    split_id = cursor.lastrowid
 
     envelope_id = get_or_create_round_up_envelope(conn, row["account_id"])
     conn.execute(
         "INSERT INTO allocations (envelope_id, split_id) VALUES (?, ?)",
-        (envelope_id, cursor.lastrowid),
+        (envelope_id, split_id),
     )
     conn.commit()
 
