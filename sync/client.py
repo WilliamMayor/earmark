@@ -16,7 +16,7 @@ import httpx
 
 from .models import Account, Transaction, TransactionStatus
 
-_BASE_URL = "https://lunchflow.app/api/v1"
+_BASE_URL = "https://www.lunchflow.app/api/v1"
 
 
 class LunchflowClient:
@@ -64,7 +64,7 @@ def _map_account(data: dict) -> Account:
         lunchflow_id=data["id"],
         name=data.get("name"),
         institution_name=data.get("institution_name"),
-        currency=data["currency"],
+        currency=data.get("currency", "GBP"),
     )
 
 
@@ -84,13 +84,17 @@ def _map_transaction(data: dict) -> Optional[Transaction]:
 
     tx_date = date.fromisoformat(data["date"]) if data.get("date") else None
 
+    status = TransactionStatus.BOOKED
+    if data.get("isPending"):
+        status = TransactionStatus.PENDING
+
     return Transaction(
         account_id=data["accountId"],
         lunchflow_id=lunchflow_id,
         amount=amount,
         currency=data["currency"],
         credit_debit_indicator=credit_debit_indicator,
-        status=TransactionStatus.PENDING if data.get("isPending") else TransactionStatus.BOOKED,
+        status=status,
         date=tx_date,
         merchant=data.get("merchant"),
         description=data.get("description"),
