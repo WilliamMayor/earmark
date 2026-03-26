@@ -13,11 +13,14 @@ import {
 	getUnallocatedTransactions,
 	getEnvelopes,
 	deleteEnvelope,
+	createSplit,
+	deleteSplit,
 	ROUND_UP_ENVELOPE_NAME
 } from '../queries.js';
 import {
 	AlreadyAllocatedError,
-	EnvelopeHasAllocationsError
+	EnvelopeHasAllocationsError,
+	SplitValidationError
 } from '../types.js';
 
 let db: Database.Database;
@@ -214,5 +217,93 @@ describe('setAccountRoundUp', () => {
 		setAccountRoundUp(accountId, null, db);
 		const row = db.prepare(`SELECT round_up_since FROM accounts WHERE id = ?`).get(accountId) as { round_up_since: string | null };
 		expect(row.round_up_since).toBeNull();
+	});
+});
+
+// ---------------------------------------------------------------------------
+// createSplit
+// ---------------------------------------------------------------------------
+
+describe('createSplit', () => {
+	it('creates a new split and reduces the default split amount', () => {
+		const txId = seedTransaction(db, accountId, { amount: '20.00' });
+		db.prepare(
+			`INSERT INTO splits (transaction_id, amount, sort_order, is_default, is_round_up) VALUES (?, '20.00', 0, 1, 0)`
+		).run(txId);
+
+		const newSplit = createSplit(txId, '7.50', 'Lunch', db);
+
+		expect(newSplit.amount).toBe('7.50');
+		expect(newSplit.note).toBe('Lunch');
+		expect(newSplit.is_default).toBeFalsy();
+		expect(newSplit.is_round_up).toBeFalsy();
+		expect(newSplit.transaction_id).toBe(txId);
+
+		const defaultSplit = db
+			.prepare(`SELECT * FROM splits WHERE transaction_id = ? AND is_default = 1`)
+			.get(txId) as { amount: string };
+		expect(defaultSplit.amount).toBe('12.50');
+	});
+
+	it('throws SplitValidationError if amount >= default split amount', () => {
+		const txId = seedTransaction(db, accountId, { amount: '10.00' });
+		db.prepare(
+			`INSERT INTO splits (transaction_id, amount, sort_order, is_default, is_round_up) VALUES (?, '10.00', 0, 1, 0)`
+		).run(txId);
+
+		expect(() => createSplit(txId, '10.00', null, db)).toThrow(SplitValidationError);
+		expect(() => createSplit(txId, '15.00', null, db)).toThrow(SplitValidationError);
+	});
+
+	it('throws SplitValidationError if amount <= 0', () => {
+		const txId = seedTransaction(db, accountId, { amount: '10.00' });
+		db.prepare(
+			`INSERT INTO splits (transaction_id, amount, sort_order, is_default, is_round_up) VALUES (?, '10.00', 0, 1, 0)`
+		).run(txId);
+
+		expect(() => createSplit(txId, '0.00', null, db)).toThrow(SplitValidationError);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// deleteSplit
+// ---------------------------------------------------------------------------
+
+describe('deleteSplit', () => {
+	it('deletes the split and returns its amount to the default split', () => {
+		const txId = seedTransaction(db, accountId, { amount: '20.00' });
+		db.prepare(
+			`INSERT INTO splits (transaction_id, amount, sort_order, is_default, is_round_up) VALUES (?, '15.00', 0, 1, 0)`
+		).run(txId);
+		db.prepare(
+			`INSERT INTO splits (transaction_id, amount, sort_order, is_default, is_round_up) VALUES (?, '5.00', 1, 0, 0)`
+		).run(txId);
+
+		const nonDefault = db
+			.prepare(`SELECT id FROM splits WHERE transaction_id = ? AND is_default = 0`)
+			.get(txId) as { id: number };
+
+		deleteSplit(nonDefault.id, db);
+
+		const gone = db.prepare(`SELECT * FROM splits WHERE id = ?`).get(nonDefault.id);
+		expect(gone).toBeUndefined();
+
+		const defaultSplit = db
+			.prepare(`SELECT amount FROM splits WHERE transaction_id = ? AND is_default = 1`)
+			.get(txId) as { amount: string };
+		expect(defaultSplit.amount).toBe('20.00');
+	});
+
+	it('throws SplitValidationError when trying to delete the default split', () => {
+		const txId = seedTransaction(db, accountId, { amount: '10.00' });
+		db.prepare(
+			`INSERT INTO splits (transaction_id, amount, sort_order, is_default, is_round_up) VALUES (?, '10.00', 0, 1, 0)`
+		).run(txId);
+
+		const defaultSplit = db
+			.prepare(`SELECT id FROM splits WHERE transaction_id = ? AND is_default = 1`)
+			.get(txId) as { id: number };
+
+		expect(() => deleteSplit(defaultSplit.id, db)).toThrow(SplitValidationError);
 	});
 });

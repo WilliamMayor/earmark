@@ -3,12 +3,14 @@ import { getDb, withRetry } from './db.js';
 import {
 	AlreadyAllocatedError,
 	EnvelopeHasAllocationsError,
+	SplitValidationError,
 	type AccountWithStats,
 	type EnvelopeWithStats,
 	type Split,
 	type SplitWithStatus,
 	type Transaction
 } from './types.js';
+import { toMinorUnits, fromMinorUnits } from './format.js';
 
 export const ROUND_UP_ENVELOPE_NAME = 'Round Up';
 
@@ -228,6 +230,77 @@ export function getSplitsWithStatus(
 			envelope_id: (row.envelope_id as number | null) ?? null,
 			envelope_name: (row.envelope_name as string | null) ?? null
 		})) as SplitWithStatus[];
+}
+
+export function createSplit(
+	txId: number,
+	amount: string,
+	note: string | null,
+	db: Database.Database = getDb()
+): Split {
+	const defaultSplit = db
+		.prepare(`SELECT * FROM splits WHERE transaction_id = ? AND is_default = 1`)
+		.get(txId) as Split | undefined;
+
+	if (!defaultSplit) {
+		throw new SplitValidationError(`No default split found for transaction ${txId}`);
+	}
+
+	const amountMinor = toMinorUnits(amount);
+	const defaultMinor = toMinorUnits(defaultSplit.amount);
+
+	if (amountMinor <= 0) {
+		throw new SplitValidationError('Split amount must be greater than 0');
+	}
+	if (amountMinor >= defaultMinor) {
+		throw new SplitValidationError('Split amount must be less than the default split amount');
+	}
+
+	const newDefaultMinor = defaultMinor - amountMinor;
+	db.prepare(`UPDATE splits SET amount = ? WHERE id = ?`).run(
+		fromMinorUnits(newDefaultMinor),
+		defaultSplit.id
+	);
+
+	const maxOrder = db
+		.prepare(`SELECT COALESCE(MAX(sort_order), -1) AS max_order FROM splits WHERE transaction_id = ?`)
+		.get(txId) as { max_order: number };
+	const sortOrder = maxOrder.max_order + 1;
+
+	const result = db
+		.prepare(
+			`INSERT INTO splits (transaction_id, amount, note, sort_order, is_default, is_round_up)
+			 VALUES (?, ?, ?, ?, 0, 0)`
+		)
+		.run(txId, amount, note, sortOrder);
+
+	return db
+		.prepare(`SELECT * FROM splits WHERE id = ?`)
+		.get(result.lastInsertRowid) as Split;
+}
+
+export function deleteSplit(splitId: number, db: Database.Database = getDb()): void {
+	const split = db.prepare(`SELECT * FROM splits WHERE id = ?`).get(splitId) as Split | undefined;
+
+	if (!split) {
+		throw new SplitValidationError(`Split ${splitId} not found`);
+	}
+
+	if (split.is_default) {
+		throw new SplitValidationError('Cannot delete the default split');
+	}
+
+	const defaultSplit = db
+		.prepare(`SELECT * FROM splits WHERE transaction_id = ? AND is_default = 1`)
+		.get(split.transaction_id) as Split;
+
+	const restoredMinor = toMinorUnits(defaultSplit.amount) + toMinorUnits(split.amount);
+	db.prepare(`UPDATE splits SET amount = ? WHERE id = ?`).run(
+		fromMinorUnits(restoredMinor),
+		defaultSplit.id
+	);
+
+	db.prepare(`DELETE FROM splits WHERE id = ?`).run(splitId);
 }
 
 // ---------------------------------------------------------------------------
