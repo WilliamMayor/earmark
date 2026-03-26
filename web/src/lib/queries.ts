@@ -225,8 +225,9 @@ export function getSplitsWithStatus(
 		.all(transactionId)
 		.map((row: Record<string, unknown>) => ({
 			...(row as Split),
+			is_default: Boolean(row.is_default),
+			is_round_up: Boolean(row.is_round_up),
 			is_allocated: (row.is_allocated as number) === 1,
-			is_round_up: false,
 			envelope_id: (row.envelope_id as number | null) ?? null,
 			envelope_name: (row.envelope_name as string | null) ?? null
 		})) as SplitWithStatus[];

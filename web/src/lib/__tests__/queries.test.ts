@@ -199,6 +199,47 @@ describe('getSplitsWithStatus', () => {
 		expect(splits[0].envelope_id).toBe(envelopeId);
 		expect(splits[0].envelope_name).toBe('Transport');
 	});
+
+	it('returns is_default as boolean true for the default split', () => {
+		const txId = seedTransaction(db, accountId, { amount: '20.00' });
+		db.prepare(
+			`INSERT INTO splits (transaction_id, amount, sort_order, is_default, is_round_up) VALUES (?, '20.00', 0, 1, 0)`
+		).run(txId);
+
+		const splits = getSplitsWithStatus(txId, db);
+		expect(splits).toHaveLength(1);
+		expect(splits[0].is_default).toBe(true);
+		expect(typeof splits[0].is_default).toBe('boolean');
+	});
+
+	it('returns is_default as boolean false for a non-default split', () => {
+		const txId = seedTransaction(db, accountId, { amount: '20.00' });
+		db.prepare(
+			`INSERT INTO splits (transaction_id, amount, sort_order, is_default, is_round_up) VALUES (?, '15.00', 0, 1, 0)`
+		).run(txId);
+		db.prepare(
+			`INSERT INTO splits (transaction_id, amount, sort_order, is_default, is_round_up) VALUES (?, '5.00', 1, 0, 0)`
+		).run(txId);
+
+		const splits = getSplitsWithStatus(txId, db);
+		expect(splits).toHaveLength(2);
+		const nonDefault = splits.find((s) => !s.is_default);
+		expect(nonDefault).toBeDefined();
+		expect(nonDefault!.is_default).toBe(false);
+		expect(typeof nonDefault!.is_default).toBe('boolean');
+	});
+
+	it('returns is_round_up as boolean false for regular splits', () => {
+		const txId = seedTransaction(db, accountId, { amount: '10.00' });
+		db.prepare(
+			`INSERT INTO splits (transaction_id, amount, sort_order, is_default, is_round_up) VALUES (?, '10.00', 0, 1, 0)`
+		).run(txId);
+
+		const splits = getSplitsWithStatus(txId, db);
+		expect(splits).toHaveLength(1);
+		expect(splits[0].is_round_up).toBe(false);
+		expect(typeof splits[0].is_round_up).toBe('boolean');
+	});
 });
 
 // ---------------------------------------------------------------------------
