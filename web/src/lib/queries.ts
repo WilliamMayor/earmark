@@ -191,12 +191,12 @@ export function deleteEnvelope(
  */
 export function setAccountRoundUp(
 	accountId: number,
-	enabled: boolean,
+	since: string | null,
 	db: Database.Database = getDb()
 ): void {
-	db.prepare(`UPDATE accounts SET round_up = ? WHERE id = ?`).run(enabled ? 1 : 0, accountId);
+	db.prepare(`UPDATE accounts SET round_up_since = ? WHERE id = ?`).run(since, accountId);
 
-	if (enabled) {
+	if (since !== null) {
 		getOrCreateRoundUpEnvelope(accountId, db);
 	}
 }

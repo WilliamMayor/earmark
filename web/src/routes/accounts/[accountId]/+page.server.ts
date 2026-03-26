@@ -124,7 +124,8 @@ export const actions = {
 		const accountId = parseInt(params.accountId, 10);
 		const data = await request.formData();
 		const enabled = data.get('enabled') === '1';
-		setAccountRoundUp(accountId, enabled);
+		const since = enabled ? new Date().toISOString().slice(0, 10) : null;
+		setAccountRoundUp(accountId, since);
 		redirect(303, `/accounts/${accountId}`);
 	}
 };

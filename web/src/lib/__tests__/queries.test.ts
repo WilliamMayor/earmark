@@ -204,15 +204,15 @@ describe('getSplitsWithStatus', () => {
 
 describe('setAccountRoundUp', () => {
 	it('enabling creates the Round Up envelope', () => {
-		setAccountRoundUp(accountId, true, db);
+		setAccountRoundUp(accountId, '2025-06-01', db);
 		const envelope = db.prepare(`SELECT name FROM envelopes WHERE account_id = ? AND name = ?`).get(accountId, ROUND_UP_ENVELOPE_NAME);
 		expect(envelope).toBeTruthy();
 	});
 
-	it('disabling sets round_up flag to 0', () => {
-		setAccountRoundUp(accountId, true, db);
-		setAccountRoundUp(accountId, false, db);
-		const row = db.prepare(`SELECT round_up FROM accounts WHERE id = ?`).get(accountId) as { round_up: number };
-		expect(row.round_up).toBe(0);
+	it('disabling sets round_up_since to null', () => {
+		setAccountRoundUp(accountId, '2025-06-01', db);
+		setAccountRoundUp(accountId, null, db);
+		const row = db.prepare(`SELECT round_up_since FROM accounts WHERE id = ?`).get(accountId) as { round_up_since: string | null };
+		expect(row.round_up_since).toBeNull();
 	});
 });
