@@ -1,10 +1,8 @@
 import type Database from 'better-sqlite3';
 import { getDb, withRetry } from './db.js';
-import { sumAmounts, amountsMatch, toMinorUnits, fromMinorUnits } from './format.js';
 import {
 	AlreadyAllocatedError,
 	EnvelopeHasAllocationsError,
-	SplitValidationError,
 	type AccountWithStats,
 	type EnvelopeWithStats,
 	type Split,
@@ -148,7 +146,7 @@ export function createEnvelope(
 /**
  * Returns the id of the "Round Up" envelope for the account, creating it if needed.
  */
-export function getOrCreateRoundUpEnvelope(
+function getOrCreateRoundUpEnvelope(
 	accountId: number,
 	db: Database.Database = getDb()
 ): number {
@@ -187,90 +185,6 @@ export function deleteEnvelope(
 // ---------------------------------------------------------------------------
 
 /**
- * If the transaction has no splits yet, create a single default split for
- * the full transaction amount. Idempotent — safe to call multiple times.
- */
-export function ensureDefaultSplit(
-	transactionId: number,
-	db: Database.Database = getDb()
-): void {
-	withRetry(() =>
-		db.transaction(() => {
-			const existing = db
-				.prepare(`SELECT COUNT(*) AS cnt FROM splits WHERE transaction_id = ? AND is_round_up = 0`)
-				.get(transactionId) as { cnt: number };
-			if (existing.cnt > 0) return;
-
-			const tx = db
-				.prepare(`SELECT amount FROM transactions WHERE id = ?`)
-				.get(transactionId) as { amount: string } | null;
-			if (!tx) throw new Error(`Transaction ${transactionId} not found`);
-
-			db.prepare(
-				`INSERT INTO splits (transaction_id, amount, sort_order) VALUES (?, ?, 0)`
-			).run(transactionId, tx.amount);
-		})()
-	);
-	ensureRoundUpSplit(transactionId, db);
-}
-
-/**
- * If the transaction's account has round_up enabled and the transaction is a DBIT
- * with a non-whole amount, ensures an is_round_up split exists and is allocated to
- * the "Round Up" envelope. Idempotent — safe to call multiple times.
- */
-export function ensureRoundUpSplit(
-	transactionId: number,
-	db: Database.Database = getDb()
-): void {
-	const row = db
-		.prepare(
-			`SELECT t.amount, t.credit_debit_indicator, t.account_id, a.round_up
-			 FROM transactions t
-			 JOIN accounts a ON a.id = t.account_id
-			 WHERE t.id = ?`
-		)
-		.get(transactionId) as {
-		amount: string;
-		credit_debit_indicator: string;
-		account_id: number;
-		round_up: number;
-	} | null;
-
-	if (!row) return;
-	if (!row.round_up || row.credit_debit_indicator !== 'DBIT') return;
-
-	const minorUnits = toMinorUnits(row.amount);
-	const roundedUp = Math.ceil(minorUnits / 100) * 100;
-	const roundUpMinorUnits = roundedUp - minorUnits;
-
-	// Nothing to round up — amount is already a whole number.
-	if (roundUpMinorUnits === 0) return;
-
-	withRetry(() =>
-		db.transaction(() => {
-			// Already has a round-up split — nothing to do.
-			const existing = db
-				.prepare(`SELECT id FROM splits WHERE transaction_id = ? AND is_round_up = 1`)
-				.get(transactionId);
-			if (existing) return;
-
-			const roundUpAmount = fromMinorUnits(roundUpMinorUnits);
-			const result = db
-				.prepare(
-					`INSERT INTO splits (transaction_id, amount, sort_order, is_round_up) VALUES (?, ?, 999, 1)`
-				)
-				.run(transactionId, roundUpAmount);
-			const splitId = result.lastInsertRowid as number;
-
-			const envelopeId = getOrCreateRoundUpEnvelope(row.account_id, db);
-			db.prepare(`INSERT INTO allocations (envelope_id, split_id) VALUES (?, ?)`)
-				.run(envelopeId, splitId);
-		})()
-	);
-}
-
-/**
  * Enable or disable the round-up feature on an account.
  * When enabling, ensures a "Round Up" envelope exists and back-fills round-up
  * splits for any currently unallocated DBIT transactions.
@@ -284,16 +198,6 @@ export function setAccountRoundUp(
 
 	if (enabled) {
 		getOrCreateRoundUpEnvelope(accountId, db);
-		// Back-fill round-up splits for existing unallocated transactions.
-		const txs = db
-			.prepare(
-				`SELECT id FROM transactions
-				 WHERE account_id = ? AND credit_debit_indicator = 'DBIT' AND status IN ('booked', 'pending')`
-			)
-			.all(accountId) as Array<{ id: number }>;
-		for (const tx of txs) {
-			ensureRoundUpSplit(tx.id, db);
-		}
 	}
 }
 
@@ -324,64 +228,6 @@ export function getSplitsWithStatus(
 			envelope_id: (row.envelope_id as number | null) ?? null,
 			envelope_name: (row.envelope_name as string | null) ?? null
 		})) as SplitWithStatus[];
-}
-
-export function saveSplits(
-	transactionId: number,
-	parts: Array<{ amount: string; note?: string }>,
-	db: Database.Database = getDb()
-): void {
-	if (parts.length < 2) {
-		throw new SplitValidationError('A split must have at least 2 parts');
-	}
-
-	for (const part of parts) {
-		const units = toMinorUnits(part.amount);
-		if (units <= 0) {
-			throw new SplitValidationError(`Split amount must be greater than zero, got "${part.amount}"`);
-		}
-	}
-
-	const tx = db
-		.prepare(`SELECT amount FROM transactions WHERE id = ?`)
-		.get(transactionId) as { amount: string } | null;
-	if (!tx) throw new Error(`Transaction ${transactionId} not found`);
-
-	const sum = sumAmounts(parts.map((p) => p.amount));
-	if (!amountsMatch(sum, tx.amount)) {
-		throw new SplitValidationError(
-			`Split amounts sum to ${sum} but transaction amount is ${tx.amount}`
-		);
-	}
-
-	withRetry(() =>
-		db.transaction(() => {
-			db.prepare(`DELETE FROM splits WHERE transaction_id = ? AND is_round_up = 0`).run(transactionId);
-			const insert = db.prepare(
-				`INSERT INTO splits (transaction_id, amount, note, sort_order) VALUES (?, ?, ?, ?)`
-			);
-			parts.forEach((part, i) => {
-				insert.run(transactionId, part.amount, part.note ?? null, i);
-			});
-		})()
-	);
-	ensureRoundUpSplit(transactionId, db);
-}
-
-/**
- * Reset a transaction back to a single default split (removes any user-defined splits
- * and any allocations for them, then creates the default split).
- */
-export function resetSplits(
-	transactionId: number,
-	db: Database.Database = getDb()
-): void {
-	withRetry(() =>
-		db.transaction(() => {
-			db.prepare(`DELETE FROM splits WHERE transaction_id = ? AND is_round_up = 0`).run(transactionId);
-		})()
-	);
-	ensureDefaultSplit(transactionId, db);
 }
 
 // ---------------------------------------------------------------------------
@@ -437,11 +283,6 @@ export function getUnallocatedTransactions(
 	`
 		)
 		.all(accountId) as Transaction[];
-
-	// Ensure every returned transaction has at least a default split
-	for (const tx of txs) {
-		ensureDefaultSplit(tx.id, db);
-	}
 
 	return txs;
 }

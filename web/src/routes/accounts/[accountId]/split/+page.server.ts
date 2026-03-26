@@ -1,7 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { getDb } from '$lib/db.js';
-import { getEnvelopes, getSplitsWithStatus, saveSplits, resetSplits, getUnallocatedTransactions } from '$lib/queries.js';
-import { SplitValidationError } from '$lib/types.js';
+import { getEnvelopes, getSplitsWithStatus, getUnallocatedTransactions } from '$lib/queries.js';
 
 export function load({ params, url }) {
 	const accountId = parseInt(params.accountId, 10);
@@ -39,28 +38,10 @@ export function load({ params, url }) {
 }
 
 export const actions = {
-	save_splits: async ({ request, params, url }) => {
+	save_splits: async ({ params, url }) => {
 		const accountId = parseInt(params.accountId, 10);
 		const txId = parseInt(url.searchParams.get('tx') ?? '', 10);
 		if (isNaN(txId)) return fail(400, { error: 'Missing transaction id' });
-
-		const data = await request.formData();
-		const amounts = data.getAll('amount') as string[];
-		const notes = data.getAll('note') as string[];
-
-		const parts = amounts.map((amount, i) => ({
-			amount: amount.trim(),
-			note: notes[i]?.trim() || undefined
-		}));
-
-		try {
-			saveSplits(txId, parts);
-		} catch (err) {
-			if (err instanceof SplitValidationError) {
-				return fail(422, { error: err.message });
-			}
-			throw err;
-		}
 
 		redirect(303, `/accounts/${accountId}/split?tx=${txId}`);
 	},
@@ -69,8 +50,6 @@ export const actions = {
 		const accountId = parseInt(params.accountId, 10);
 		const txId = parseInt(url.searchParams.get('tx') ?? '', 10);
 		if (isNaN(txId)) redirect(303, `/accounts/${accountId}`);
-
-		resetSplits(txId);
 
 		// Find the index of this transaction in the unallocated list to return to the right dock position
 		const unallocated = getUnallocatedTransactions(accountId);
