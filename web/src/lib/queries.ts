@@ -223,14 +223,17 @@ export function getSplitsWithStatus(
 	`
 		)
 		.all(transactionId)
-		.map((row: Record<string, unknown>) => ({
-			...(row as Split),
-			is_default: Boolean(row.is_default),
-			is_round_up: Boolean(row.is_round_up),
-			is_allocated: (row.is_allocated as number) === 1,
-			envelope_id: (row.envelope_id as number | null) ?? null,
-			envelope_name: (row.envelope_name as string | null) ?? null
-		})) as SplitWithStatus[];
+		.map((row: unknown) => {
+			const r = row as Record<string, unknown>;
+			return {
+				...(r as unknown as Split),
+				is_default: Boolean(r.is_default),
+				is_round_up: Boolean(r.is_round_up),
+				is_allocated: (r.is_allocated as number) === 1,
+				envelope_id: (r.envelope_id as number | null) ?? null,
+				envelope_name: (r.envelope_name as string | null) ?? null
+			};
+		}) as SplitWithStatus[];
 }
 
 export function createSplit(
