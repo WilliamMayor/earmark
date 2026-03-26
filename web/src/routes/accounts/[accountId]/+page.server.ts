@@ -9,9 +9,11 @@ import {
 	deleteEnvelope,
 	allocateSplit,
 	getSplitsWithStatus,
-	setAccountRoundUp
+	setAccountRoundUp,
+	createSplit,
+	deleteSplit
 } from '$lib/queries.js';
-import { AlreadyAllocatedError, EnvelopeHasAllocationsError } from '$lib/types.js';
+import { AlreadyAllocatedError, EnvelopeHasAllocationsError, SplitValidationError } from '$lib/types.js';
 
 export function load({ params, url }) {
 	const accountId = parseInt(params.accountId, 10);
@@ -127,5 +129,43 @@ export const actions = {
 		const since = enabled ? new Date().toISOString().slice(0, 10) : null;
 		setAccountRoundUp(accountId, since);
 		redirect(303, `/accounts/${accountId}`);
+	},
+
+	create_split: async ({ request, params }) => {
+		const accountId = parseInt(params.accountId, 10);
+		const data = await request.formData();
+		const txId = parseInt(data.get('tx_id') as string, 10);
+		const amount = (data.get('amount') as string)?.trim();
+		const note = (data.get('note') as string)?.trim() || null;
+		const currentIndex = parseInt((data.get('current_index') as string) ?? '0', 10);
+
+		if (isNaN(txId) || !amount) return fail(400, { error: 'Invalid input' });
+
+		try {
+			createSplit(txId, amount, note);
+		} catch (err) {
+			if (err instanceof SplitValidationError) return fail(422, { error: err.message });
+			throw err;
+		}
+
+		redirect(303, `/accounts/${accountId}?tx=${currentIndex}`);
+	},
+
+	delete_split: async ({ request, params }) => {
+		const accountId = parseInt(params.accountId, 10);
+		const data = await request.formData();
+		const splitId = parseInt(data.get('split_id') as string, 10);
+		const currentIndex = parseInt((data.get('current_index') as string) ?? '0', 10);
+
+		if (isNaN(splitId)) return fail(400, { error: 'Invalid input' });
+
+		try {
+			deleteSplit(splitId);
+		} catch (err) {
+			if (err instanceof SplitValidationError) return fail(422, { error: err.message });
+			throw err;
+		}
+
+		redirect(303, `/accounts/${accountId}?tx=${currentIndex}`);
 	}
 };
