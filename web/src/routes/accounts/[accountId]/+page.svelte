@@ -9,6 +9,9 @@
 	let newEnvelopeName = $state('');
 	let renamingId = $state<number | null>(null);
 	let renameValue = $state('');
+	let showAddSplitForm = $state(false);
+	let addSplitAmount = $state('');
+	let addSplitNote = $state('');
 
 	// Swipe state
 	let touchStartX = $state(0);
@@ -72,20 +75,20 @@
 				<p class="text-sm font-medium text-gray-900">Round Up</p>
 				<p class="text-xs text-gray-500">Save the spare change from every transaction</p>
 			</div>
-			<input type="hidden" name="enabled" value={account.round_up ? '0' : '1'} />
+			<input type="hidden" name="enabled" value={account.round_up_since !== null ? '0' : '1'} />
 			<button
 				type="submit"
 				class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-				class:bg-indigo-600={account.round_up}
-				class:bg-gray-200={!account.round_up}
+				class:bg-indigo-600={account.round_up_since !== null}
+				class:bg-gray-200={account.round_up_since === null}
 				role="switch"
-				aria-checked={account.round_up}
+				aria-checked={account.round_up_since !== null}
 				aria-label="Toggle round up"
 			>
 				<span
 					class="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition duration-200"
-					class:translate-x-5={account.round_up}
-					class:translate-x-0={!account.round_up}
+					class:translate-x-5={account.round_up_since !== null}
+					class:translate-x-0={account.round_up_since === null}
 				></span>
 			</button>
 		</form>
@@ -307,34 +310,106 @@
 					</div>
 				</div>
 
-				<!-- Split parts summary (if split) -->
-				{#if isMultiSplit}
-					<div class="mt-2 space-y-1">
-						{#each splits as split, i (split.id)}
-							<div class="flex items-center gap-2 text-xs">
-								<span class={split.is_allocated ? 'text-green-600' : 'text-gray-400'}>
-									{split.is_allocated ? '✓' : '○'}
-								</span>
-								<span class="text-gray-600">{formatCurrency(split.amount, tx.currency)}</span>
-								{#if split.note}<span class="text-gray-400">— {split.note}</span>{/if}
-								{#if split.is_allocated && split.envelope_name}
-									<span class="text-green-600 ml-auto">{split.envelope_name}</span>
-								{/if}
+				<!-- Split management -->
+				<div class="mt-2 space-y-2">
+					{#each splits as split (split.id)}
+						<div class="border border-gray-100 rounded-lg p-2 text-sm">
+							<div class="flex items-center justify-between gap-2">
+								<div class="flex items-center gap-2 min-w-0">
+									{#if split.is_round_up}
+										<span class="text-xs text-purple-600 font-medium shrink-0">Round Up</span>
+									{:else if split.is_default}
+										<span class="text-xs text-gray-400 shrink-0">Default</span>
+									{/if}
+									<span class="font-medium text-gray-900">{formatCurrency(split.amount, tx.currency)}</span>
+									{#if split.note}<span class="text-gray-400 truncate">— {split.note}</span>{/if}
+									{#if split.is_allocated && split.envelope_name}
+										<span class="text-green-600 ml-1 shrink-0">{split.envelope_name}</span>
+									{/if}
+								</div>
+								<div class="flex items-center gap-1 shrink-0">
+									{#if split.is_default && !split.is_round_up}
+										<button
+											type="button"
+											onclick={() => { showAddSplitForm = !showAddSplitForm; addSplitAmount = ''; addSplitNote = ''; }}
+											class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded hover:bg-gray-200"
+											data-testid="split-btn"
+										>
+											✂ Split
+										</button>
+									{/if}
+									{#if !split.is_default && !split.is_round_up}
+										<form method="POST" action="?/delete_split" use:enhance>
+											<input type="hidden" name="split_id" value={split.id} />
+											<input type="hidden" name="current_index" value={data.currentTxIndex} />
+											<button
+												type="submit"
+												class="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50"
+												onclick={(e) => { if (!confirm('Delete this split?')) e.preventDefault(); }}
+											>
+												Delete
+											</button>
+										</form>
+									{/if}
+								</div>
 							</div>
-						{/each}
-					</div>
-				{/if}
-
-				<!-- Actions -->
-				<div class="flex gap-2 mt-3">
-					<a
-						href="/accounts/{account.id}/split?tx={tx.id}"
-						class="flex-1 text-center bg-gray-100 text-gray-700 text-sm font-medium rounded-lg py-2 hover:bg-gray-200"
-						data-testid="split-btn"
-					>
-						✂ Split
-					</a>
+						</div>
+					{/each}
 				</div>
+
+				<!-- Add split form (inline, toggled by Split button) -->
+				{#if showAddSplitForm}
+					{@const defaultSplit = splits.find(s => s.is_default)}
+					{#if defaultSplit}
+						<form
+							method="POST"
+							action="?/create_split"
+							use:enhance={() => ({ update }) => { update(); showAddSplitForm = false; addSplitAmount = ''; addSplitNote = ''; }}
+							class="mt-2 border border-indigo-200 rounded-lg p-3 space-y-2 bg-indigo-50"
+						>
+							<input type="hidden" name="tx_id" value={tx.id} />
+							<input type="hidden" name="current_index" value={data.currentTxIndex} />
+							<div>
+								<label class="block text-xs font-medium text-gray-700 mb-1" for="split-amount">Amount</label>
+								<input
+									id="split-amount"
+									name="amount"
+									type="text"
+									bind:value={addSplitAmount}
+									placeholder="e.g. 12.50"
+									required
+									class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+								/>
+							</div>
+							<div>
+								<label class="block text-xs font-medium text-gray-700 mb-1" for="split-note">Note (optional)</label>
+								<input
+									id="split-note"
+									name="note"
+									type="text"
+									bind:value={addSplitNote}
+									placeholder="e.g. Coffee"
+									class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+								/>
+							</div>
+							<div class="flex gap-2">
+								<button
+									type="submit"
+									class="flex-1 bg-indigo-600 text-white text-xs font-medium rounded py-1.5 hover:bg-indigo-700"
+								>
+									Add split
+								</button>
+								<button
+									type="button"
+									onclick={() => { showAddSplitForm = false; addSplitAmount = ''; addSplitNote = ''; }}
+									class="flex-1 bg-gray-100 text-gray-700 text-xs font-medium rounded py-1.5 hover:bg-gray-200"
+								>
+									Cancel
+								</button>
+							</div>
+						</form>
+					{/if}
+				{/if}
 			</div>
 		</div>
 	{/if}
