@@ -5,12 +5,13 @@
 </script>
 
 <svelte:head>
-	<title>Accounts — Budget</title>
+	<title>Accounts — EARMARK</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gray-50">
-	<header class="bg-white border-b border-gray-200 px-4 py-4">
-		<h1 class="text-xl font-semibold text-gray-900">Accounts</h1>
+<div class="min-h-screen bg-slate-50">
+	<header class="bg-navy px-4 py-4 flex items-center justify-between">
+		<span class="font-mono font-bold uppercase tracking-[3.5px] text-white text-[13px]">EARMARK</span>
+		<span class="font-mono font-bold uppercase tracking-[2px] text-white/40 text-[11px]">Accounts</span>
 	</header>
 
 	<main class="p-4 space-y-3 max-w-lg mx-auto">
@@ -38,7 +39,7 @@
 						</div>
 						{#if account.unallocated_count > 0}
 							<span
-								class="bg-orange-100 text-orange-700 text-xs font-semibold px-2 py-1 rounded-full"
+								class="bg-orange-50 text-orange-700 text-xs font-semibold px-2 py-1 rounded-full"
 								data-testid="unallocated-badge"
 							>
 								{account.unallocated_count} to allocate
