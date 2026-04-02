@@ -104,8 +104,8 @@
 				method="POST"
 				action="?/create_envelope"
 				use:enhance={() => {
-					return ({ update }) => {
-						update();
+					return async ({ update }) => {
+						await update();
 						showNewEnvelopeForm = false;
 						newEnvelopeName = '';
 					};
