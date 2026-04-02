@@ -3,8 +3,8 @@
 Sync bank account transactions to a local SQLite database via Lunchflow.
 
 Usage:
-  uv run sync_transactions.py           # sync all connected accounts
-  uv run sync_transactions.py --db PATH # use a specific database file
+  uv run python -m sync           # sync all connected accounts
+  uv run python -m sync --db PATH # use a specific database file
 
 Bank connections are managed at https://www.lunchflow.app
 """
@@ -17,10 +17,10 @@ from pathlib import Path
 
 import httpx
 
-from sync.client import LunchflowClient
-from sync.config import load_config
-from sync.db import get_connection, init_schema, upsert_account
-from sync.sync import sync_all
+from .client import LunchflowClient
+from .config import load_config
+from .db import get_connection, init_schema, upsert_account
+from .sync import sync_all
 
 
 def main() -> None:
