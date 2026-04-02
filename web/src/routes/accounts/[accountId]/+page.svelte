@@ -51,20 +51,20 @@
 </script>
 
 <svelte:head>
-	<title>{account.name ?? account.institution_name} — Budget</title>
+	<title>{account.name ?? account.institution_name} — EARMARK</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gray-50 flex flex-col">
+<div class="min-h-screen bg-slate-50 flex flex-col">
 	<!-- Header -->
-	<header class="bg-white border-b border-gray-200 px-4 py-4 flex items-center gap-3">
-		<a href="/accounts" class="text-gray-500 hover:text-gray-700" aria-label="Back">
+	<header class="bg-navy px-4 py-4 flex items-center gap-3">
+		<a href="/accounts" class="text-white/60 hover:text-white" aria-label="Back">
 			<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
 			</svg>
 		</a>
 		<div>
-			<h1 class="text-xl font-semibold text-gray-900">{account.name ?? account.institution_name}</h1>
-			<p class="text-xs text-gray-400">{account.institution_name} · {account.currency}</p>
+			<h1 class="text-xl font-semibold text-white">{account.name ?? account.institution_name}</h1>
+			<p class="text-xs text-white/50">{account.institution_name} · {account.currency}</p>
 		</div>
 	</header>
 
@@ -78,8 +78,8 @@
 			<input type="hidden" name="enabled" value={account.round_up_since !== null ? '0' : '1'} />
 			<button
 				type="submit"
-				class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-				class:bg-indigo-600={account.round_up_since !== null}
+				class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+				class:bg-blue-600={account.round_up_since !== null}
 				class:bg-gray-200={account.round_up_since === null}
 				role="switch"
 				aria-checked={account.round_up_since !== null}
@@ -121,7 +121,7 @@
 					name="name"
 					type="text"
 					bind:value={newEnvelopeName}
-					class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+					class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 					placeholder="e.g. Groceries"
 					required
 							autofocus
@@ -129,7 +129,7 @@
 				<div class="flex gap-2 mt-3">
 					<button
 						type="submit"
-						class="flex-1 bg-indigo-600 text-white text-sm font-medium rounded-lg py-2 hover:bg-indigo-700"
+						class="flex-1 bg-blue-600 text-white text-sm font-medium rounded-lg py-2 hover:bg-blue-700"
 					>
 						Create
 					</button>
@@ -145,7 +145,7 @@
 		{:else}
 			<button
 				onclick={() => { showNewEnvelopeForm = true; }}
-				class="w-full bg-white rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
+				class="w-full bg-white rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
 				data-testid="new-envelope-btn"
 			>
 				+ New envelope
@@ -168,11 +168,11 @@
 							name="name"
 							type="text"
 							bind:value={renameValue}
-							class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2"
+							class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
 							autofocus
 						/>
 						<div class="flex gap-2">
-							<button type="submit" class="text-xs text-indigo-600 font-medium">Save</button>
+							<button type="submit" class="text-xs text-blue-600 font-medium">Save</button>
 							<button type="button" onclick={cancelRename} class="text-xs text-gray-500">Cancel</button>
 						</div>
 					</form>
@@ -181,7 +181,7 @@
 						<div>
 							<p class="font-medium text-gray-900">{envelope.name}</p>
 							<p class="text-sm text-gray-500">
-								{formatCurrency(envelope.allocated_total, account.currency)}
+								<span class="font-mono">{formatCurrency(envelope.allocated_total, account.currency)}</span>
 							</p>
 						</div>
 						<div class="flex items-center gap-1">
@@ -194,7 +194,7 @@
 										<input type="hidden" name="current_index" value={data.currentTxIndex} />
 										<button
 											type="submit"
-											class="bg-indigo-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-indigo-700"
+											class="bg-blue-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-blue-700"
 											data-testid="allocate-btn"
 										>
 											Allocate
@@ -234,7 +234,7 @@
 					<!-- Balance bar -->
 					<div class="w-full bg-gray-100 rounded-full h-1.5">
 						<div
-							class="bg-indigo-500 h-1.5 rounded-full transition-all duration-300"
+							class="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
 							style="width: {envelope.percent_of_total}%"
 						></div>
 					</div>
@@ -301,9 +301,9 @@
 						<p class="text-xs text-gray-400">{formatDate(tx.date)}</p>
 					</div>
 					<div class="text-right ml-4 shrink-0">
-						<p class="font-bold text-gray-900">{formatCurrency(tx.amount, tx.currency)}</p>
+						<p class="font-bold text-gray-900 font-mono">{formatCurrency(tx.amount, tx.currency)}</p>
 						{#if isMultiSplit && unallocatedSplits.length > 0}
-							<p class="text-xs text-indigo-600 font-medium">
+							<p class="text-xs text-blue-600 font-medium font-mono">
 								Next: {formatCurrency(unallocatedSplits[0].amount, tx.currency)}
 							</p>
 						{/if}
@@ -321,7 +321,7 @@
 									{:else if split.is_default}
 										<span class="text-xs text-gray-400 shrink-0">Default</span>
 									{/if}
-									<span class="font-medium text-gray-900">{formatCurrency(split.amount, tx.currency)}</span>
+									<span class="font-medium text-gray-900 font-mono">{formatCurrency(split.amount, tx.currency)}</span>
 									{#if split.note}<span class="text-gray-400 truncate">— {split.note}</span>{/if}
 									{#if split.is_allocated && split.envelope_name}
 										<span class="text-green-600 ml-1 shrink-0">{split.envelope_name}</span>
@@ -365,7 +365,7 @@
 							method="POST"
 							action="?/create_split"
 							use:enhance={() => ({ update }) => { update(); showAddSplitForm = false; addSplitAmount = ''; addSplitNote = ''; }}
-							class="mt-2 border border-indigo-200 rounded-lg p-3 space-y-2 bg-indigo-50"
+							class="mt-2 border border-blue-200 rounded-lg p-3 space-y-2 bg-blue-50"
 						>
 							<input type="hidden" name="tx_id" value={tx.id} />
 							<input type="hidden" name="current_index" value={data.currentTxIndex} />
@@ -378,7 +378,7 @@
 									bind:value={addSplitAmount}
 									placeholder="e.g. 12.50"
 									required
-									class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+									class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 								/>
 							</div>
 							<div>
@@ -389,13 +389,13 @@
 									type="text"
 									bind:value={addSplitNote}
 									placeholder="e.g. Coffee"
-									class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+									class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 								/>
 							</div>
 							<div class="flex gap-2">
 								<button
 									type="submit"
-									class="flex-1 bg-indigo-600 text-white text-xs font-medium rounded py-1.5 hover:bg-indigo-700"
+									class="flex-1 bg-blue-600 text-white text-xs font-medium rounded py-1.5 hover:bg-blue-700"
 								>
 									Add split
 								</button>
