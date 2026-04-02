@@ -2,7 +2,8 @@ services:
   web:
     build:
       context: .
-      dockerfile: Dockerfile.web
+      dockerfile: Dockerfile
+      target: runtime
     ports:
       - "3000:3000"
     environment:
@@ -17,7 +18,7 @@ services:
   sync:
     image: ghcr.io/astral-sh/uv:python3.14-bookworm-slim
     working_dir: /app
-    command: ["uv", "run", "sync_transactions.py"]
+    command: ["uv", "run", "python", "-m", "sync"]
     volumes:
       - .:/app
       - ./data:/data
@@ -27,3 +28,17 @@ services:
       - .env
     profiles:
       - sync
+
+  sync-cron:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: sync-cron
+    volumes:
+      - .:/app
+      - ./data:/data
+    environment:
+      DB_PATH: /data/transactions.db
+    env_file:
+      - .env
+    restart: unless-stopped
