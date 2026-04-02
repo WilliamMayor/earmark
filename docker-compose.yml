@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runtime
+    profiles: [prod]
     ports:
       - "3000:3000"
     environment:
@@ -27,3 +28,23 @@ services:
     ports:
       - "8080:8080"
     restart: unless-stopped
+
+  web-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: web-dev
+    profiles: [dev]
+    ports:
+      - "5173:5173"
+    environment:
+      DB_PATH: /data/transactions.db
+      ORIGIN: http://localhost:5173
+    volumes:
+      - ./web:/app
+      - web_node_modules:/app/node_modules
+      - ./data:/data
+    restart: unless-stopped
+
+volumes:
+  web_node_modules:
