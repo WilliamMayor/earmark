@@ -24,7 +24,7 @@ def get_db_path() -> Path:
     env_path = os.environ.get("DB_PATH")
     if env_path:
         return Path(env_path)
-    return SCRIPT_DIR / "transactions.db"
+    return SCRIPT_DIR / "data" / "transactions.db"
 
 
 def main() -> None:

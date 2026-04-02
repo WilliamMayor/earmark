@@ -5,7 +5,7 @@ __pycache__/
 *.db
 *.pem
 .env
-transactions.db-shm
-transactions.db-wal
+data/transactions.db-shm
+data/transactions.db-wal
 web/tests/fixture.db-shm
 web/tests/fixture.db-wal

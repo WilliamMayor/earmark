@@ -8,7 +8,7 @@ from pathlib import Path
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Summarise accounts in the transactions database")
-    parser.add_argument("--db", default="transactions.db", help="Path to SQLite database")
+    parser.add_argument("--db", default="data/transactions.db", help="Path to SQLite database")
     args = parser.parse_args()
 
     db_path = Path(args.db)

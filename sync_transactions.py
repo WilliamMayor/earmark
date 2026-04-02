@@ -25,7 +25,7 @@ from sync.sync import sync_all
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Sync bank transactions via Lunchflow")
-    parser.add_argument("--db", default="transactions.db", help="Path to SQLite database")
+    parser.add_argument("--db", default="data/transactions.db", help="Path to SQLite database")
     args = parser.parse_args()
 
     config = load_config()

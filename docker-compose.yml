@@ -7,8 +7,9 @@ services:
       - "3000:3000"
     environment:
       DB_PATH: /data/transactions.db
+      ORIGIN: http://localhost:3000
     volumes:
-      - db_data:/data
+      - ./data:/data
     restart: unless-stopped
 
   # The Python sync tool is a one-shot command, not a long-running service.
@@ -19,14 +20,10 @@ services:
     command: ["uv", "run", "sync_transactions.py"]
     volumes:
       - .:/app
-      - db_data:/data
+      - ./data:/data
     environment:
       DB_PATH: /data/transactions.db
     env_file:
       - .env
     profiles:
       - sync
-
-volumes:
-  db_data:
-    driver: local

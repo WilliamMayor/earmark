@@ -16,5 +16,5 @@ class Config:
 def load_config() -> Config:
     return Config(
         api_key=os.environ["LUNCHFLOW_API_KEY"],
-        db_path=Path(os.environ.get("DB_PATH", "transactions.db")),
+        db_path=Path(os.environ.get("DB_PATH", "data/transactions.db")),
     )
