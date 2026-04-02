@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -22,8 +22,10 @@ export function initFixtureDb() {
 		DROP TABLE IF EXISTS sessions;
 	`);
 
-	db.exec(readFileSync(join(migrationsDir, '0001_initial.sql'), 'utf8'));
-	db.exec(readFileSync(join(migrationsDir, '0002_envelopes.sql'), 'utf8'));
+	const migrations = readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort();
+	for (const migration of migrations) {
+		db.exec(readFileSync(join(migrationsDir, migration), 'utf8'));
+	}
 
 	insertFixtureData(db);
 	db.close();
