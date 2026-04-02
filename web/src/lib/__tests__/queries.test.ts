@@ -76,10 +76,10 @@ describe('getUnallocatedTransactions', () => {
 		expect(txs).toHaveLength(0);
 	});
 
-	it('excludes opening_balance status', () => {
+	it('includes opening_balance status', () => {
 		seedTransaction(db, accountId, { amount: '10.00', status: 'opening_balance' });
 		const txs = getUnallocatedTransactions(accountId, db);
-		expect(txs).toHaveLength(0);
+		expect(txs).toHaveLength(1);
 	});
 
 	it('excludes fully allocated transactions', () => {

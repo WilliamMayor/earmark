@@ -61,7 +61,8 @@ def sync_account(conn: sqlite3.Connection, client: object, account: Account) -> 
                         credit_debit_indicator=cdi,
                         status=TransactionStatus.OPENING_BALANCE,
                         date=earliest_date - timedelta(days=1),
-                        note="Opening balance adjustor — edit if incorrect.",
+                        merchant="Balance correction",
+                        description="Your transaction history only goes back so far. This entry makes the opening balance match your actual account balance — allocate it to cover any spending that happened before your history begins.",
                     ),
                 )
                 assert saved_adjustor.id is not None

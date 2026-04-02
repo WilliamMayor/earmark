@@ -25,8 +25,10 @@ export function getAccounts(db: Database.Database = getDb()): AccountWithStats[]
 		SELECT
 			a.*,
 			COUNT(CASE
-				WHEN t.credit_debit_indicator = 'DBIT'
-				AND  t.status IN ('booked', 'pending')
+				WHEN (
+					(t.credit_debit_indicator = 'DBIT' AND t.status IN ('booked', 'pending'))
+					OR t.status = 'opening_balance'
+				)
 				AND  EXISTS (SELECT 1 FROM splits s WHERE s.transaction_id = t.id AND s.is_round_up = 0)
 				AND  NOT EXISTS (
 					SELECT 1 FROM splits s2
@@ -35,8 +37,10 @@ export function getAccounts(db: Database.Database = getDb()): AccountWithStats[]
 					AND NOT EXISTS (SELECT 1 FROM allocations al WHERE al.split_id = s2.id)
 				)
 				THEN NULL
-				WHEN t.credit_debit_indicator = 'DBIT'
-				AND  t.status IN ('booked', 'pending')
+				WHEN (
+					(t.credit_debit_indicator = 'DBIT' AND t.status IN ('booked', 'pending'))
+					OR t.status = 'opening_balance'
+				)
 				THEN 1
 			END) AS unallocated_count
 		FROM accounts a
@@ -59,8 +63,10 @@ export function getAccount(
 		SELECT
 			a.*,
 			COUNT(CASE
-				WHEN t.credit_debit_indicator = 'DBIT'
-				AND  t.status IN ('booked', 'pending')
+				WHEN (
+					(t.credit_debit_indicator = 'DBIT' AND t.status IN ('booked', 'pending'))
+					OR t.status = 'opening_balance'
+				)
 				AND  EXISTS (SELECT 1 FROM splits s WHERE s.transaction_id = t.id AND s.is_round_up = 0)
 				AND  NOT EXISTS (
 					SELECT 1 FROM splits s2
@@ -69,8 +75,10 @@ export function getAccount(
 					AND NOT EXISTS (SELECT 1 FROM allocations al WHERE al.split_id = s2.id)
 				)
 				THEN NULL
-				WHEN t.credit_debit_indicator = 'DBIT'
-				AND  t.status IN ('booked', 'pending')
+				WHEN (
+					(t.credit_debit_indicator = 'DBIT' AND t.status IN ('booked', 'pending'))
+					OR t.status = 'opening_balance'
+				)
 				THEN 1
 			END) AS unallocated_count
 		FROM accounts a
@@ -345,8 +353,10 @@ export function getUnallocatedTransactions(
 		SELECT t.*
 		FROM transactions t
 		WHERE t.account_id = ?
-		  AND t.credit_debit_indicator = 'DBIT'
-		  AND t.status IN ('booked', 'pending')
+		  AND (
+		      (t.credit_debit_indicator = 'DBIT' AND t.status IN ('booked', 'pending'))
+		      OR t.status = 'opening_balance'
+		  )
 		  AND NOT (
 		      EXISTS (SELECT 1 FROM splits s WHERE s.transaction_id = t.id AND s.is_round_up = 0)
 		      AND NOT EXISTS (
