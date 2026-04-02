@@ -12,3 +12,4 @@ web/tests/fixture.db-wal
 docs
 test-results
 .superpowers/
+.worktrees/
