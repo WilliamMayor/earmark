@@ -22,10 +22,13 @@ def do_sync() -> dict:
     conn = get_connection(config.db_path)
     init_schema(conn)
 
-    with LunchflowClient(config.api_key) as client:
-        for api_account in client.list_accounts():
-            upsert_account(conn, api_account)
-        results = sync_all(conn, client)
+    try:
+        with LunchflowClient(config.api_key) as client:
+            for api_account in client.list_accounts():
+                upsert_account(conn, api_account)
+            results = sync_all(conn, client)
+    finally:
+        conn.close()
 
     total = sum(r.get("upserted", 0) for r in results)
     errors = [r["error"] for r in results if "error" in r]
@@ -39,7 +42,7 @@ def do_sync() -> dict:
 
 async def _run_sync() -> dict:
     """Acquire lock and run do_sync() in the thread pool."""
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     async with _lock:
         return await loop.run_in_executor(None, do_sync)
 
