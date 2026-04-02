@@ -10,3 +10,4 @@ data/transactions.db-wal
 web/tests/fixture.db-shm
 web/tests/fixture.db-wal
 docs
+test-results
