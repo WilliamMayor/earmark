@@ -44,7 +44,6 @@ services:
       - ./web:/app
       - web_node_modules:/app/node_modules
       - ./data:/data
-    restart: unless-stopped
 
 volumes:
   web_node_modules:
