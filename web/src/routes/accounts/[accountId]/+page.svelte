@@ -303,8 +303,8 @@
 					<div class="text-right ml-4 shrink-0">
 						<p class="font-bold text-gray-900 font-mono">{formatCurrency(tx.amount, tx.currency)}</p>
 						{#if isMultiSplit && unallocatedSplits.length > 0}
-							<p class="text-xs text-blue-600 font-medium font-mono">
-								Next: {formatCurrency(unallocatedSplits[0].amount, tx.currency)}
+							<p class="text-xs text-blue-600 font-medium">
+								Next: <span class="font-mono">{formatCurrency(unallocatedSplits[0].amount, tx.currency)}</span>
 							</p>
 						{/if}
 					</div>
