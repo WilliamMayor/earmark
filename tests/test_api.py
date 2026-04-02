@@ -2,7 +2,9 @@
 
 from unittest.mock import MagicMock
 
-from sync.api import do_sync
+from fastapi.testclient import TestClient
+
+from sync.api import app, do_sync
 
 
 def test_do_sync_aggregates_upserted_counts(mocker):
@@ -46,3 +48,30 @@ def test_do_sync_captures_account_errors(mocker):
     result = do_sync()
 
     assert result == {"total_upserted": 0, "accounts_synced": 1, "errors": ["API timeout"]}
+
+
+def test_health_endpoint():
+    with TestClient(app) as client:
+        response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_sync_endpoint_returns_result(mocker):
+    mocker.patch("sync.api.do_sync", return_value={
+        "total_upserted": 5,
+        "accounts_synced": 2,
+        "errors": [],
+    })
+    with TestClient(app) as client:
+        response = client.post("/sync")
+    assert response.status_code == 200
+    assert response.json() == {"total_upserted": 5, "accounts_synced": 2, "errors": []}
+
+
+def test_sync_endpoint_returns_500_on_exception(mocker):
+    mocker.patch("sync.api.do_sync", side_effect=Exception("Authentication failed"))
+    with TestClient(app) as client:
+        response = client.post("/sync")
+    assert response.status_code == 500
+    assert "Authentication failed" in response.json()["detail"]
