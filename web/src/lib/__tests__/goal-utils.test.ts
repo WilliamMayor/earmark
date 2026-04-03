@@ -145,7 +145,8 @@ describe('getEstimatedCompletion', () => {
         expect(result).not.toBeNull();
         // 320 contributed over 120 days (Jan 1–May 1) → ~2.67/day
         // 680 remaining / 2.67/day ≈ 255 days → early Jan 2027
-        expect(result! > new Date('2026-05-01')).toBe(true);
+        expect(result! > new Date('2026-12-01')).toBe(true);
+        expect(result! < new Date('2027-03-01')).toBe(true);
     });
 });
 
