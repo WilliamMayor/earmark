@@ -14,10 +14,12 @@ export function createTestDb(): Database.Database {
 	const schema0001 = readFileSync(join(migrationsDir, '0001_initial.sql'), 'utf8');
 	const schema0002 = readFileSync(join(migrationsDir, '0002_envelopes.sql'), 'utf8');
 	const schema0003 = readFileSync(join(migrationsDir, '0003_round_up.sql'), 'utf8');
+	const schema0004 = readFileSync(join(migrationsDir, '0004_envelope_goals.sql'), 'utf8');
 
 	db.exec(schema0001);
 	db.exec(schema0002);
 	db.exec(schema0003);
+	db.exec(schema0004);
 
 	return db;
 }
