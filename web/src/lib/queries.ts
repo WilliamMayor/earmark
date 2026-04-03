@@ -109,9 +109,11 @@ export function getEnvelopes(
 			COALESCE(SUM(
 				CASE WHEN t.credit_debit_indicator = 'DBIT' THEN CAST(s.amount AS REAL) ELSE 0 END
 			), 0) AS allocated_raw,
+			-- goal_balance: net of all allocated splits (CRDT adds, DBIT subtracts).
+			-- No status filter — intentionally consistent with allocated_raw.
 			COALESCE(SUM(
 				CASE
-					WHEN t.credit_debit_indicator = 'CRDT' THEN  CAST(s.amount AS REAL)
+					WHEN t.credit_debit_indicator = 'CRDT' THEN CAST(s.amount AS REAL)
 					WHEN t.credit_debit_indicator = 'DBIT' THEN -CAST(s.amount AS REAL)
 					ELSE 0
 				END
@@ -163,9 +165,11 @@ export function getEnvelope(
 			COALESCE(SUM(
 				CASE WHEN t.credit_debit_indicator = 'DBIT' THEN CAST(s.amount AS REAL) ELSE 0 END
 			), 0) AS allocated_raw,
+			-- goal_balance: net of all allocated splits (CRDT adds, DBIT subtracts).
+			-- No status filter — intentionally consistent with allocated_raw.
 			COALESCE(SUM(
 				CASE
-					WHEN t.credit_debit_indicator = 'CRDT' THEN  CAST(s.amount AS REAL)
+					WHEN t.credit_debit_indicator = 'CRDT' THEN CAST(s.amount AS REAL)
 					WHEN t.credit_debit_indicator = 'DBIT' THEN -CAST(s.amount AS REAL)
 					ELSE 0
 				END
@@ -240,12 +244,13 @@ export function getGoalContribution(
 	since: string,
 	db: Database.Database = getDb()
 ): number {
+	// No status filter on transactions — intentionally consistent with allocated_raw.
 	const row = db
 		.prepare(
 			`
 		SELECT COALESCE(SUM(
 			CASE
-				WHEN t.credit_debit_indicator = 'CRDT' THEN  CAST(s.amount AS REAL)
+				WHEN t.credit_debit_indicator = 'CRDT' THEN CAST(s.amount AS REAL)
 				WHEN t.credit_debit_indicator = 'DBIT' THEN -CAST(s.amount AS REAL)
 				ELSE 0
 			END

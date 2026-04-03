@@ -445,11 +445,14 @@ describe('setGoal', () => {
 describe('removeGoal', () => {
 	it('nulls all goal columns', () => {
 		const envelopeId = seedEnvelope(db, accountId, 'Bills');
-		setGoal(envelopeId, { amount: '30.00', rrule: null, dtstart: null, dueDate: '2026-08-01' }, db);
+		setGoal(envelopeId, { amount: '30.00', rrule: 'FREQ=MONTHLY;BYMONTHDAY=5', dtstart: '2026-05-05', dueDate: null }, db);
 		removeGoal(envelopeId, db);
 
 		const row = db.prepare(`SELECT * FROM envelopes WHERE id = ?`).get(envelopeId) as Record<string, unknown>;
 		expect(row.goal_amount).toBeNull();
+		expect(row.goal_rrule).toBeNull();
+		expect(row.goal_dtstart).toBeNull();
+		expect(row.goal_due_date).toBeNull();
 		expect(row.goal_created_at).toBeNull();
 	});
 });
