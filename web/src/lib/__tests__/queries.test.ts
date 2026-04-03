@@ -15,7 +15,11 @@ import {
 	deleteEnvelope,
 	createSplit,
 	deleteSplit,
-	ROUND_UP_ENVELOPE_NAME
+	ROUND_UP_ENVELOPE_NAME,
+	getEnvelope,
+	setGoal,
+	removeGoal,
+	getGoalContribution
 } from '../queries.js';
 import {
 	AlreadyAllocatedError,
@@ -364,5 +368,110 @@ describe('deleteSplit', () => {
 			.get(txId) as { id: number };
 
 		expect(() => deleteSplit(defaultSplit.id, db)).toThrow(SplitValidationError);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// getEnvelope
+// ---------------------------------------------------------------------------
+
+describe('getEnvelope', () => {
+	it('returns null for a non-existent id', () => {
+		expect(getEnvelope(9999, db)).toBeNull();
+	});
+
+	it('returns the envelope with goal_balance of 0 when no allocations', () => {
+		const envelopeId = seedEnvelope(db, accountId, 'Test');
+		const envelope = getEnvelope(envelopeId, db);
+		expect(envelope).not.toBeNull();
+		expect(envelope!.goal_balance).toBe(0);
+	});
+
+	it('adds CRDT allocations to goal_balance', () => {
+		const txId = seedTransaction(db, accountId, { amount: '50.00', creditDebit: 'CRDT' });
+		db.prepare(`INSERT INTO splits (transaction_id, amount, sort_order) VALUES (?, '50.00', 0)`).run(txId);
+		const envelopeId = seedEnvelope(db, accountId, 'Savings');
+		const split = db.prepare(`SELECT id FROM splits WHERE transaction_id = ?`).get(txId) as { id: number };
+		allocateSplit(envelopeId, split.id, db);
+
+		const envelope = getEnvelope(envelopeId, db);
+		expect(envelope!.goal_balance).toBeCloseTo(50);
+	});
+
+	it('subtracts DBIT allocations from goal_balance', () => {
+		const crTxId = seedTransaction(db, accountId, { amount: '50.00', creditDebit: 'CRDT' });
+		db.prepare(`INSERT INTO splits (transaction_id, amount, sort_order) VALUES (?, '50.00', 0)`).run(crTxId);
+		const dbTxId = seedTransaction(db, accountId, { amount: '20.00', creditDebit: 'DBIT' });
+		db.prepare(`INSERT INTO splits (transaction_id, amount, sort_order) VALUES (?, '20.00', 0)`).run(dbTxId);
+
+		const envelopeId = seedEnvelope(db, accountId, 'Savings');
+		const crSplit = db.prepare(`SELECT id FROM splits WHERE transaction_id = ?`).get(crTxId) as { id: number };
+		const dbSplit = db.prepare(`SELECT id FROM splits WHERE transaction_id = ?`).get(dbTxId) as { id: number };
+		allocateSplit(envelopeId, crSplit.id, db);
+		allocateSplit(envelopeId, dbSplit.id, db);
+
+		const envelope = getEnvelope(envelopeId, db);
+		expect(envelope!.goal_balance).toBeCloseTo(30);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// setGoal / removeGoal
+// ---------------------------------------------------------------------------
+
+describe('setGoal', () => {
+	it('sets goal columns on the envelope', () => {
+		const envelopeId = seedEnvelope(db, accountId, 'Bills');
+		setGoal(envelopeId, { amount: '30.00', rrule: 'FREQ=MONTHLY;BYMONTHDAY=5', dtstart: '2026-05-05', dueDate: null }, db);
+
+		const row = db.prepare(`SELECT * FROM envelopes WHERE id = ?`).get(envelopeId) as Record<string, unknown>;
+		expect(row.goal_amount).toBe('30.00');
+		expect(row.goal_rrule).toBe('FREQ=MONTHLY;BYMONTHDAY=5');
+		expect(row.goal_created_at).not.toBeNull();
+	});
+
+	it('does not reset goal_created_at on subsequent calls', () => {
+		const envelopeId = seedEnvelope(db, accountId, 'Bills');
+		setGoal(envelopeId, { amount: '30.00', rrule: null, dtstart: null, dueDate: '2026-08-01' }, db);
+		const first = (db.prepare(`SELECT goal_created_at FROM envelopes WHERE id = ?`).get(envelopeId) as { goal_created_at: string }).goal_created_at;
+
+		setGoal(envelopeId, { amount: '50.00', rrule: null, dtstart: null, dueDate: '2026-09-01' }, db);
+		const second = (db.prepare(`SELECT goal_created_at FROM envelopes WHERE id = ?`).get(envelopeId) as { goal_created_at: string }).goal_created_at;
+
+		expect(first).toBe(second);
+	});
+});
+
+describe('removeGoal', () => {
+	it('nulls all goal columns', () => {
+		const envelopeId = seedEnvelope(db, accountId, 'Bills');
+		setGoal(envelopeId, { amount: '30.00', rrule: null, dtstart: null, dueDate: '2026-08-01' }, db);
+		removeGoal(envelopeId, db);
+
+		const row = db.prepare(`SELECT * FROM envelopes WHERE id = ?`).get(envelopeId) as Record<string, unknown>;
+		expect(row.goal_amount).toBeNull();
+		expect(row.goal_created_at).toBeNull();
+	});
+});
+
+// ---------------------------------------------------------------------------
+// getGoalContribution
+// ---------------------------------------------------------------------------
+
+describe('getGoalContribution', () => {
+	it('returns 0 when no allocations since given date', () => {
+		const envelopeId = seedEnvelope(db, accountId, 'Test');
+		expect(getGoalContribution(envelopeId, '2026-01-01', db)).toBe(0);
+	});
+
+	it('counts CRDT allocations on or after since date', () => {
+		const txId = seedTransaction(db, accountId, { amount: '100.00', creditDebit: 'CRDT', date: '2026-03-15' });
+		db.prepare(`INSERT INTO splits (transaction_id, amount, sort_order) VALUES (?, '100.00', 0)`).run(txId);
+		const envelopeId = seedEnvelope(db, accountId, 'Savings');
+		const split = db.prepare(`SELECT id FROM splits WHERE transaction_id = ?`).get(txId) as { id: number };
+		allocateSplit(envelopeId, split.id, db);
+
+		expect(getGoalContribution(envelopeId, '2026-01-01', db)).toBeCloseTo(100);
+		expect(getGoalContribution(envelopeId, '2026-04-01', db)).toBe(0);
 	});
 });
