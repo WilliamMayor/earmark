@@ -108,7 +108,14 @@ export function getEnvelopes(
 			e.*,
 			COALESCE(SUM(
 				CASE WHEN t.credit_debit_indicator = 'DBIT' THEN CAST(s.amount AS REAL) ELSE 0 END
-			), 0) AS allocated_raw
+			), 0) AS allocated_raw,
+			COALESCE(SUM(
+				CASE
+					WHEN t.credit_debit_indicator = 'CRDT' THEN  CAST(s.amount AS REAL)
+					WHEN t.credit_debit_indicator = 'DBIT' THEN -CAST(s.amount AS REAL)
+					ELSE 0
+				END
+			), 0) AS goal_balance
 		FROM envelopes e
 		LEFT JOIN allocations al ON al.envelope_id = e.id
 		LEFT JOIN splits s ON s.id = al.split_id
@@ -118,7 +125,9 @@ export function getEnvelopes(
 		ORDER BY e.sort_order, e.name
 	`
 		)
-		.all(accountId) as Array<Omit<EnvelopeWithStats, 'allocated_total' | 'percent_of_total'> & { allocated_raw: number }>;
+		.all(accountId) as Array<
+			Omit<EnvelopeWithStats, 'allocated_total' | 'percent_of_total'> & { allocated_raw: number; goal_balance: number }
+		>;
 
 	return rows.map((row) => ({
 		...row,
@@ -140,6 +149,116 @@ export function getTotalSpend(accountId: number, db: Database.Database = getDb()
 		)
 		.get(accountId) as { total: number };
 	return row.total;
+}
+
+export function getEnvelope(
+	envelopeId: number,
+	db: Database.Database = getDb()
+): EnvelopeWithStats | null {
+	const row = db
+		.prepare(
+			`
+		SELECT
+			e.*,
+			COALESCE(SUM(
+				CASE WHEN t.credit_debit_indicator = 'DBIT' THEN CAST(s.amount AS REAL) ELSE 0 END
+			), 0) AS allocated_raw,
+			COALESCE(SUM(
+				CASE
+					WHEN t.credit_debit_indicator = 'CRDT' THEN  CAST(s.amount AS REAL)
+					WHEN t.credit_debit_indicator = 'DBIT' THEN -CAST(s.amount AS REAL)
+					ELSE 0
+				END
+			), 0) AS goal_balance
+		FROM envelopes e
+		LEFT JOIN allocations al ON al.envelope_id = e.id
+		LEFT JOIN splits s ON s.id = al.split_id
+		LEFT JOIN transactions t ON t.id = s.transaction_id
+		WHERE e.id = ?
+		GROUP BY e.id
+	`
+		)
+		.get(envelopeId) as
+		| (Omit<EnvelopeWithStats, 'allocated_total' | 'percent_of_total'> & {
+				allocated_raw: number;
+				goal_balance: number;
+		  })
+		| null;
+
+	if (!row) return null;
+
+	const accountId = row.account_id;
+	const totalSpend = getTotalSpend(accountId, db);
+
+	return {
+		...row,
+		allocated_total: row.allocated_raw.toFixed(2),
+		percent_of_total: totalSpend > 0 ? Math.min((row.allocated_raw / totalSpend) * 100, 100) : 0
+	};
+}
+
+export interface GoalParams {
+	amount: string;
+	rrule:   string | null;
+	dtstart: string | null;
+	dueDate: string | null;
+}
+
+export function setGoal(
+	envelopeId: number,
+	params: GoalParams,
+	db: Database.Database = getDb()
+): void {
+	const existing = db
+		.prepare(`SELECT goal_created_at FROM envelopes WHERE id = ?`)
+		.get(envelopeId) as { goal_created_at: string | null } | null;
+
+	// goal_created_at is write-once: preserve it if it already exists
+	const createdAt = existing?.goal_created_at ?? new Date().toISOString().slice(0, 10);
+
+	db.prepare(
+		`UPDATE envelopes
+		 SET goal_amount = ?, goal_rrule = ?, goal_dtstart = ?, goal_due_date = ?, goal_created_at = ?
+		 WHERE id = ?`
+	).run(params.amount, params.rrule, params.dtstart, params.dueDate, createdAt, envelopeId);
+}
+
+export function removeGoal(
+	envelopeId: number,
+	db: Database.Database = getDb()
+): void {
+	db.prepare(
+		`UPDATE envelopes
+		 SET goal_amount = NULL, goal_rrule = NULL, goal_dtstart = NULL,
+		     goal_due_date = NULL, goal_created_at = NULL
+		 WHERE id = ?`
+	).run(envelopeId);
+}
+
+export function getGoalContribution(
+	envelopeId: number,
+	since: string,
+	db: Database.Database = getDb()
+): number {
+	const row = db
+		.prepare(
+			`
+		SELECT COALESCE(SUM(
+			CASE
+				WHEN t.credit_debit_indicator = 'CRDT' THEN  CAST(s.amount AS REAL)
+				WHEN t.credit_debit_indicator = 'DBIT' THEN -CAST(s.amount AS REAL)
+				ELSE 0
+			END
+		), 0) AS net_contributed
+		FROM allocations al
+		JOIN splits s ON s.id = al.split_id
+		JOIN transactions t ON t.id = s.transaction_id
+		WHERE al.envelope_id = ?
+		  AND t.date >= ?
+	`
+		)
+		.get(envelopeId, since) as { net_contributed: number };
+	return row.net_contributed;
 }
 
 export function createEnvelope(

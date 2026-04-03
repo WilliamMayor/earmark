@@ -32,12 +32,20 @@ export interface Envelope {
 	name: string;
 	sort_order: number;
 	created_at: string;
+	// Goal columns — null means no goal is set
+	goal_amount:     string | null;
+	goal_rrule:      string | null;
+	goal_dtstart:    string | null;
+	goal_due_date:   string | null;
+	goal_created_at: string | null;
 }
 
 export interface EnvelopeWithStats extends Envelope {
-	allocated_raw: number;
-	allocated_total: string;
+	allocated_raw:    number;
+	allocated_total:  string;
 	percent_of_total: number;
+	// Net balance used for goal progress (CRDT allocations add, DBIT subtract)
+	goal_balance:     number;
 }
 
 export interface Split {
