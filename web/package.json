@@ -15,7 +15,8 @@
   "dependencies": {
     "@fontsource-variable/space-grotesk": "^5.2.10",
     "@fontsource/space-mono": "^5.2.9",
-    "better-sqlite3": "^9.6.0"
+    "better-sqlite3": "^9.6.0",
+    "rrule": "^2.8.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.44.0",
