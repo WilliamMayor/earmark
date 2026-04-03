@@ -32,6 +32,24 @@ beforeEach(() => {
 });
 
 // ---------------------------------------------------------------------------
+// envelope goal columns
+// ---------------------------------------------------------------------------
+
+describe('envelope goal columns', () => {
+	it('envelopes table has goal columns', () => {
+		const cols = db
+			.prepare(`PRAGMA table_info(envelopes)`)
+			.all() as Array<{ name: string }>;
+		const names = cols.map((c) => c.name);
+		expect(names).toContain('goal_amount');
+		expect(names).toContain('goal_rrule');
+		expect(names).toContain('goal_dtstart');
+		expect(names).toContain('goal_due_date');
+		expect(names).toContain('goal_created_at');
+	});
+});
+
+// ---------------------------------------------------------------------------
 // allocateSplit
 // ---------------------------------------------------------------------------
 
