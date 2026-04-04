@@ -10,23 +10,65 @@ We use tailwindCSS for styling. Don't use any custom CSS, only use tailwind clas
 
 Refactor complex UI elements into independent components to keep files short and focused.
 
-## Running Tests
+## Test-Driven Development
 
-### Web (SvelteKit / Vitest)
+This project follows a test-driven development (TDD) process. **All test suites must pass before any code is pushed to GitHub.** The CI pipeline will reject PRs with failing tests.
 
-Dependencies must be installed before running tests. Always run from the `web/` directory:
+### Workflow
+
+1. **Write tests first** — before implementing or changing functionality, write tests that describe the expected behavior.
+2. **Run tests to see failures** — confirm the tests fail for the right reason.
+3. **Implement the feature** — write the minimum code to make the tests pass.
+4. **Run all tests** — verify nothing is broken.
+5. **Refactor** — clean up the code while keeping tests green.
+6. **Commit and push** — only after all tests pass.
+
+### Running Tests
+
+All tests should be run using Docker to ensure consistent dependencies. Build the images first, then run the test containers.
+
+#### Web Unit Tests
 
 ```bash
-cd web && npm install
-npm test           # unit tests (vitest run)
-npm run test:e2e   # end-to-end tests (playwright)
-npm run test:all   # unit + e2e
+docker compose run --rm web-unit
 ```
 
-The correct unit test command is `npm test`, not `npm run test:unit`.
-
-### Python (sync / backend)
+#### Web E2E Tests
 
 ```bash
-uv run pytest
+docker compose run --rm web-e2e
 ```
+
+#### Python Tests
+
+```bash
+docker compose run --rm python-tests
+```
+
+#### Run All Tests
+
+```bash
+docker compose run --rm web-unit
+docker compose run --rm web-e2e
+docker compose run --rm python-tests
+```
+
+### Test Suites Overview
+
+| Suite | Docker Service | Purpose |
+|-------|---------------|---------|
+| **Web Unit Tests** | `web-unit` | Test pure functions, utilities, and type logic |
+| **Web E2E Tests** | `web-e2e` | Test full user flows in a real browser (Playwright) |
+| **Python Tests** | `python-tests` | Test sync service, API client, database, and migrations |
+
+### Pre-Push Checklist
+
+Before pushing any changes, run all test suites:
+
+```bash
+docker compose run --rm web-unit
+docker compose run --rm web-e2e
+docker compose run --rm python-tests
+```
+
+All tests must pass before pushing. The GitHub Actions CI workflow will run all three suites on every PR and block merges if any fail.
