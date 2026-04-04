@@ -34,7 +34,7 @@
     let editorDueDate  = $state('');
 
     // Derived rrule string for recurring editor
-    const derivedRrule = $derived(() => {
+    const derivedRrule = $derived.by(() => {
         if (editorType !== 'recurring') return '';
         try {
             const { rrule } = buildRrule(editorFreq, {
@@ -51,7 +51,7 @@
     });
 
     // Derived dtstart (default to today for recurring)
-    const derivedDtstart = $derived(() => {
+    const derivedDtstart = $derived.by(() => {
         if (editorType !== 'recurring') return '';
         const { dtstart } = buildRrule(editorFreq, {
             byDay:       editorFreq === 'WEEKLY'  ? editorByDay      : undefined,
@@ -83,7 +83,7 @@
     const milestones       = $derived(getMilestones(envelope));
     const goalDescription  = $derived(formatGoalDescription(envelope));
 
-    const goalPercent = $derived(() => {
+    const goalPercent = $derived.by(() => {
         if (!envelope.goal_amount) return 0;
         const target = parseFloat(envelope.goal_amount);
         return target > 0 ? Math.min((envelope.goal_balance / target) * 100, 100) : 0;
@@ -188,9 +188,9 @@
                 <div class="bg-gray-100 rounded-full h-2 mb-2">
                     <div
                         class="h-2 rounded-full transition-all"
-                        class:bg-green-500={goalPercent() >= 100}
-                        class:bg-indigo-500={goalPercent() < 100}
-                        style="width: {goalPercent()}%"
+                        class:bg-green-500={goalPercent >= 100}
+                        class:bg-indigo-500={goalPercent < 100}
+                        style="width: {goalPercent}%"
                     ></div>
                 </div>
                 <div class="flex justify-between text-xs text-gray-500 mb-4">
@@ -358,12 +358,12 @@
                         {/if}
 
                         <!-- Hidden fields for rrule + dtstart -->
-                        <input type="hidden" name="rrule"   value={derivedRrule()} />
-                        <input type="hidden" name="dtstart" value={derivedDtstart()} />
+                        <input type="hidden" name="rrule"   value={derivedRrule} />
+                        <input type="hidden" name="dtstart" value={derivedDtstart} />
 
                         <!-- RRULE hint -->
                         <p class="text-xs text-indigo-400 font-mono mb-3 bg-indigo-50 rounded px-2 py-1">
-                            {derivedRrule()}
+                            {derivedRrule}
                         </p>
                     {/if}
 
