@@ -53,13 +53,17 @@
     // Derived dtstart (default to today for recurring)
     const derivedDtstart = $derived.by(() => {
         if (editorType !== 'recurring') return '';
-        const { dtstart } = buildRrule(editorFreq, {
-            byDay:       editorFreq === 'WEEKLY'  ? editorByDay      : undefined,
-            byMonthDay:  (editorFreq === 'MONTHLY' || editorFreq === 'YEARLY') ? editorByMonthDay : undefined,
-            byMonth:     editorFreq === 'YEARLY'  ? editorByMonth    : undefined,
-            dtstart:     new Date()
-        });
-        return dtstart;
+        try {
+            const { dtstart } = buildRrule(editorFreq, {
+                byDay:       editorFreq === 'WEEKLY'  ? editorByDay      : undefined,
+                byMonthDay:  (editorFreq === 'MONTHLY' || editorFreq === 'YEARLY') ? editorByMonthDay : undefined,
+                byMonth:     editorFreq === 'YEARLY'  ? editorByMonth    : undefined,
+                dtstart:     new Date()
+            });
+            return dtstart;
+        } catch {
+            return '';
+        }
     });
 
     function openGoalEditor() {
