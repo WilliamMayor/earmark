@@ -70,6 +70,16 @@ export function getRates(
     };
 }
 
+/**
+ * Estimates the date by which an open-ended goal will be fully funded, based on the
+ * average daily contribution rate since the goal was created.
+ *
+ * `netContributed` is a separate parameter rather than using `envelope.goal_balance`
+ * directly because callers may want to pass a DB-queried net contribution since
+ * `goal_created_at` specifically (via `getGoalContribution()`). This value may differ
+ * from `goal_balance` if pre-goal allocations exist that should not count toward the
+ * rate calculation.
+ */
 export function getEstimatedCompletion(
     envelope: EnvelopeWithStats,
     netContributed: number,
@@ -78,17 +88,18 @@ export function getEstimatedCompletion(
     if (inferGoalType(envelope) !== 'open_ended') return null;
     if (!envelope.goal_created_at || netContributed <= 0) return null;
 
+    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const [y, m, d] = envelope.goal_created_at.split('-').map(Number);
     const createdAt = new Date(y, m - 1, d);
     const msPerDay = 1000 * 60 * 60 * 24;
-    const daysElapsed = Math.max(1, Math.round((today.getTime() - createdAt.getTime()) / msPerDay));
+    const daysElapsed = Math.max(1, Math.round((todayMidnight.getTime() - createdAt.getTime()) / msPerDay));
 
     const avgDailyRate = netContributed / daysElapsed;
     const remaining = getRemainingAmount(envelope);
     if (avgDailyRate <= 0 || remaining <= 0) return null;
 
     const daysToFinish = Math.ceil(remaining / avgDailyRate);
-    const result = new Date(today);
+    const result = new Date(todayMidnight);
     result.setDate(result.getDate() + daysToFinish);
     return result;
 }
