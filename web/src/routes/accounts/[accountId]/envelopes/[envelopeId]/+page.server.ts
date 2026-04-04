@@ -35,21 +35,23 @@ export const actions = {
         const goalType = data.get('goal_type') as string;
         const amount   = (data.get('amount') as string)?.trim();
 
-        if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+        const parsedAmount = parseFloat(amount);
+        if (!amount || isNaN(parsedAmount) || parsedAmount <= 0) {
             return fail(400, { error: 'A valid target amount is required' });
         }
+        const normalizedAmount = parsedAmount.toFixed(2);
 
         if (goalType === 'recurring') {
             const rrule   = (data.get('rrule')   as string)?.trim() || null;
             const dtstart = (data.get('dtstart') as string)?.trim() || null;
             if (!rrule || !dtstart) return fail(400, { error: 'Recurrence rule and start date are required' });
-            setGoal(envelopeId, { amount, rrule, dtstart, dueDate: null });
+            setGoal(envelopeId, { amount: normalizedAmount, rrule, dtstart, dueDate: null });
         } else if (goalType === 'one_off') {
             const dueDate = (data.get('due_date') as string)?.trim() || null;
             if (!dueDate) return fail(400, { error: 'A due date is required' });
-            setGoal(envelopeId, { amount, rrule: null, dtstart: null, dueDate });
+            setGoal(envelopeId, { amount: normalizedAmount, rrule: null, dtstart: null, dueDate });
         } else if (goalType === 'open_ended') {
-            setGoal(envelopeId, { amount, rrule: null, dtstart: null, dueDate: null });
+            setGoal(envelopeId, { amount: normalizedAmount, rrule: null, dtstart: null, dueDate: null });
         } else {
             return fail(400, { error: 'Invalid goal type' });
         }
