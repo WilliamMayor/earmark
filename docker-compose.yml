@@ -48,5 +48,38 @@ services:
       - web_node_modules:/app/node_modules
       - ./data:/data
 
+  web-unit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: web-dev
+    volumes:
+      - ./web:/app
+      - web_node_modules:/app/node_modules
+      - ./migrations:/migrations
+    working_dir: /app
+    command: npm test
+
+  web-e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: e2e-test
+    working_dir: /app
+    command: npx playwright test
+
+  python-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: sync-runtime
+    volumes:
+      - ./sync:/app/sync
+      - ./tests:/app/tests
+      - ./pyproject.toml:/app/pyproject.toml
+      - ./uv.lock:/app/uv.lock
+    working_dir: /app
+    command: uv run pytest
+
 volumes:
   web_node_modules:

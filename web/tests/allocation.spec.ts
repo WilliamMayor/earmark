@@ -32,6 +32,7 @@ test.describe('Allocation flow', () => {
 
 		// Click first Allocate button (allocates to first envelope in list)
 		await page.getByTestId('allocate-btn').first().click();
+		await page.waitForURL(/\?tx=/);
 
 		// After allocation, the transaction queue shrinks; dock shows next tx
 		const dock = page.getByTestId('allocation-dock');
@@ -53,15 +54,15 @@ test.describe('Allocation flow', () => {
 		await page.getByTestId('allocate-btn').first().click();
 		await page.waitForURL(/\?tx=/);
 
-		// tx3 is a split — allocating part 1 redirects to the split page
+		// tx3 is a split — allocate first split part
 		await page.getByTestId('allocate-btn').first().click();
-		await page.waitForURL(/\/split\?tx=/);
+		await page.waitForURL(/\?tx=/);
 
-		// Allocate part 2 from the split page, then redirects back to account
-		await page.getByTestId('split-allocate-btn').first().click();
-		await page.waitForURL(/accounts\/\d+(?!.*split)/);
+		// Allocate second split part — redirects to account page (may still have ?tx= pointing to next unallocated)
+		await page.getByTestId('allocate-btn').first().click();
+		await page.waitForTimeout(500);
 
-		// All done — no dock
+		// All done — no dock (tx4 is already allocated, so no more unallocated txs)
 		await expect(page.getByTestId('allocation-dock')).not.toBeVisible();
 	});
 
@@ -102,10 +103,17 @@ test.describe('Allocation flow', () => {
 		await expect(page.getByTestId('envelope-card').filter({ hasText: 'Rent' })).toBeVisible();
 	});
 
-	test('split button navigates to split page', async ({ page }) => {
+	test('split button shows inline split form', async ({ page }) => {
 		const url = await getAccountUrl(page);
 		await page.goto(url);
 		await page.getByTestId('split-btn').click();
-		await expect(page).toHaveURL(/\/split\?tx=\d+/);
+
+		// The split button shows a form inline without navigation
+		await page.waitForTimeout(200);
+
+		// Inline form should be visible in dock
+		const dock = page.getByTestId('allocation-dock');
+		await expect(dock.getByLabel('Amount')).toBeVisible();
+		await expect(dock.getByLabel('Note (optional)')).toBeVisible();
 	});
 });
