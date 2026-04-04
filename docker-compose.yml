@@ -1,15 +1,16 @@
 services:
-  web:
+  web-prod:
     build:
       context: .
       dockerfile: Dockerfile
       target: runtime
-    profiles: [prod]
+    image: localhost:5000/web-prod:latest
+    profiles: ["deploy"]
     ports:
-      - "3000:3000"
+      - "8001:3000"
     environment:
       DB_PATH: /data/transactions.db
-      ORIGIN: http://localhost:3000
+      ORIGIN: http://localhost:8001
     volumes:
       - ./data:/data
     restart: unless-stopped
@@ -19,6 +20,8 @@ services:
       context: .
       dockerfile: Dockerfile
       target: sync-runtime
+    image: localhost:5000/sync:latest
+    profiles: ["deploy", "dev"]
     volumes:
       - ./data:/data
     environment:
@@ -26,7 +29,7 @@ services:
     env_file:
       - .env
     ports:
-      - "8080:8080"
+      - "8002:8080"
     restart: unless-stopped
 
   web-dev:
@@ -34,7 +37,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: web-dev
-    profiles: [dev]
+    profiles: ["dev"]
     ports:
       - "5173:5173"
     environment:
