@@ -4,15 +4,13 @@ import {
 	getEnvelopes,
 	getUnallocatedTransactions,
 	createEnvelope,
-	renameEnvelope,
-	deleteEnvelope,
 	allocateSplit,
 	getSplitsWithStatus,
 	setAccountRoundUp,
 	createSplit,
 	deleteSplit
 } from '$lib/queries.js';
-import { AlreadyAllocatedError, EnvelopeHasAllocationsError, SplitValidationError } from '$lib/types.js';
+import { AlreadyAllocatedError, SplitValidationError } from '$lib/types.js';
 
 export function load({ params, url }) {
 	const accountId = parseInt(params.accountId, 10);
@@ -72,38 +70,6 @@ export const actions = {
 			const e = err as { code?: string };
 			if (e?.code === 'SQLITE_CONSTRAINT_UNIQUE') {
 				return fail(409, { error: `An envelope named "${name}" already exists` });
-			}
-			throw err;
-		}
-
-		redirect(303, `/accounts/${accountId}`);
-	},
-
-	rename_envelope: async ({ request, params }) => {
-		const accountId = parseInt(params.accountId, 10);
-		const data = await request.formData();
-		const envelopeId = parseInt(data.get('envelope_id') as string, 10);
-		const name = (data.get('name') as string)?.trim();
-
-		if (!name) return fail(400, { error: 'Envelope name is required' });
-		if (isNaN(envelopeId)) return fail(400, { error: 'Invalid envelope' });
-
-		renameEnvelope(envelopeId, name);
-		redirect(303, `/accounts/${accountId}`);
-	},
-
-	delete_envelope: async ({ request, params }) => {
-		const accountId = parseInt(params.accountId, 10);
-		const data = await request.formData();
-		const envelopeId = parseInt(data.get('envelope_id') as string, 10);
-
-		if (isNaN(envelopeId)) return fail(400, { error: 'Invalid envelope' });
-
-		try {
-			deleteEnvelope(envelopeId);
-		} catch (err) {
-			if (err instanceof EnvelopeHasAllocationsError) {
-				return fail(409, { error: err.message });
 			}
 			throw err;
 		}

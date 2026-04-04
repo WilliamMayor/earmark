@@ -2,13 +2,12 @@
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { formatCurrency, formatDate } from '$lib/format.js';
+	import { inferGoalType, getRemainingAmount, getEstimatedCompletion } from '$lib/goal-utils.js';
 
 	let { data } = $props();
 
 	let showNewEnvelopeForm = $state(false);
 	let newEnvelopeName = $state('');
-	let renamingId = $state<number | null>(null);
-	let renameValue = $state('');
 	let showAddSplitForm = $state(false);
 	let addSplitAmount = $state('');
 	let addSplitNote = $state('');
@@ -35,16 +34,6 @@
 		if (nextIndex !== currentTxIndex) {
 			goto(`?tx=${nextIndex}`, { replaceState: true });
 		}
-	}
-
-	function startRename(id: number, currentName: string) {
-		renamingId = id;
-		renameValue = currentName;
-	}
-
-	function cancelRename() {
-		renamingId = null;
-		renameValue = '';
 	}
 
 	const account = $derived(data.account);
@@ -154,92 +143,104 @@
 
 		<!-- Envelope cards -->
 		{#each data.envelopes as envelope (envelope.id)}
-			<div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm" data-testid="envelope-card">
-				{#if renamingId === envelope.id}
-					<!-- Rename form -->
-					<form
-						method="POST"
-						action="?/rename_envelope"
-						use:enhance={() => ({ update }) => { update(); cancelRename(); }}
-					>
-						<input type="hidden" name="envelope_id" value={envelope.id} />
-						<!-- svelte-ignore a11y_autofocus -->
-						<input
-							name="name"
-							type="text"
-							bind:value={renameValue}
-							class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
-							autofocus
-						/>
-						<div class="flex gap-2">
-							<button type="submit" class="text-xs text-blue-600 font-medium">Save</button>
-							<button type="button" onclick={cancelRename} class="text-xs text-gray-500">Cancel</button>
-						</div>
-					</form>
-				{:else}
-					<div class="flex items-start justify-between mb-3">
-						<div>
-							<p class="font-medium text-gray-900">{envelope.name}</p>
-							<p class="text-sm text-gray-500">
-								<span class="font-mono">{formatCurrency(envelope.allocated_total, account.currency)}</span>
-							</p>
-						</div>
-						<div class="flex items-center gap-1">
-							{#if data.mode === 'allocate' && data.currentTx}
-								{@const unallocatedSplit = data.currentSplits.find(s => !s.is_allocated)}
-								{#if unallocatedSplit}
-									<form method="POST" action="?/allocate" use:enhance>
-										<input type="hidden" name="envelope_id" value={envelope.id} />
-										<input type="hidden" name="split_id" value={unallocatedSplit.id} />
-										<input type="hidden" name="current_index" value={data.currentTxIndex} />
-										<button
-											type="submit"
-											class="bg-blue-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-blue-700"
-											data-testid="allocate-btn"
-										>
-											Allocate
-										</button>
-									</form>
+			{@const envGoalType = inferGoalType(envelope)}
+			{@const remaining = envGoalType !== null ? getRemainingAmount(envelope) : 0}
+			{@const goalAmount = envelope.goal_amount ? parseFloat(envelope.goal_amount) : 0}
+			{@const balance = envGoalType !== null ? envelope.goal_balance : parseFloat(envelope.allocated_total)}
+			{@const isFunded = envGoalType !== null && remaining === 0}
+			{@const progressPct = envGoalType !== null && goalAmount > 0
+				? Math.min(100, Math.round((envelope.goal_balance / goalAmount) * 100))
+				: envelope.percent_of_total}
+			{@const estCompletion = envGoalType === 'open_ended'
+				? getEstimatedCompletion(envelope, envelope.goal_balance, new Date())
+				: null}
+			<a
+				href="/accounts/{account.id}/envelopes/{envelope.id}"
+				class="block bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:border-blue-300 transition-colors"
+				data-testid="envelope-card"
+			>
+				<div class="flex items-start justify-between mb-2">
+					<div class="flex-1 min-w-0">
+						<p class="font-medium text-gray-900 truncate">{envelope.name}</p>
+						{#if envGoalType === null}
+							<p class="text-xs text-gray-400">{progressPct.toFixed(0)}% of spend</p>
+						{:else if envGoalType === 'recurring' || envGoalType === 'one_off'}
+							<p class="text-xs text-gray-400">
+								{#if envelope.goal_due_date}
+									Due {formatDate(envelope.goal_due_date)}
+								{:else if envelope.goal_dtstart}
+									Recurring
 								{/if}
-							{/if}
-							<button
-								onclick={() => startRename(envelope.id, envelope.name)}
-								class="p-1.5 text-gray-400 hover:text-gray-600 rounded"
-								aria-label="Rename envelope"
+							</p>
+						{:else if envGoalType === 'open_ended'}
+							<p class="text-xs text-gray-400">
+								{#if estCompletion}
+									est. {estCompletion.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+								{:else}
+									Open-ended
+								{/if}
+							</p>
+						{/if}
+					</div>
+					<div class="text-right ml-4 shrink-0">
+						<p class="text-xl font-bold font-mono text-gray-900">
+							{formatCurrency(balance.toFixed(2), account.currency)}
+						</p>
+						{#if envGoalType !== null}
+							<p class="text-xs text-gray-400">of {formatCurrency(envelope.goal_amount!, account.currency)}</p>
+						{/if}
+					</div>
+				</div>
+
+				<!-- Progress bar -->
+				<div class="w-full bg-gray-100 rounded-full h-1.5 mb-2">
+					<div
+						class="h-1.5 rounded-full transition-all duration-300"
+						class:bg-green-500={isFunded}
+						class:bg-indigo-500={!isFunded && envGoalType !== null}
+						class:bg-blue-600={envGoalType === null}
+						style="width: {progressPct}%"
+					></div>
+				</div>
+
+				<!-- Status line + allocate button -->
+				<div class="flex items-center justify-between">
+					{#if envGoalType !== null}
+						{#if isFunded}
+							<p class="text-xs text-green-600 font-medium">Goal reached</p>
+						{:else}
+							<p class="text-xs text-gray-500">
+								{formatCurrency(remaining.toFixed(2), account.currency)} still needed
+							</p>
+						{/if}
+					{:else}
+						<span></span>
+					{/if}
+
+					{#if data.mode === 'allocate' && data.currentTx}
+						{@const unallocatedSplit = data.currentSplits.find(s => !s.is_allocated)}
+						{#if unallocatedSplit}
+							<form
+								method="POST"
+								action="?/allocate"
+								use:enhance
+								onclick={(e) => e.stopPropagation()}
 							>
-								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-										d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-								</svg>
-							</button>
-							<form method="POST" action="?/delete_envelope" use:enhance>
 								<input type="hidden" name="envelope_id" value={envelope.id} />
+								<input type="hidden" name="split_id" value={unallocatedSplit.id} />
+								<input type="hidden" name="current_index" value={data.currentTxIndex} />
 								<button
 									type="submit"
-									class="p-1.5 text-gray-400 hover:text-red-500 rounded"
-									aria-label="Delete envelope"
-									onclick={(e) => {
-										if (!confirm(`Delete "${envelope.name}"?`)) e.preventDefault();
-									}}
+									class="bg-blue-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-blue-700"
+									data-testid="allocate-btn"
 								>
-									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-											d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-									</svg>
+									Allocate
 								</button>
 							</form>
-						</div>
-					</div>
-
-					<!-- Balance bar -->
-					<div class="w-full bg-gray-100 rounded-full h-1.5">
-						<div
-							class="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
-							style="width: {envelope.percent_of_total}%"
-						></div>
-					</div>
-				{/if}
-			</div>
+						{/if}
+					{/if}
+				</div>
+			</a>
 		{/each}
 	</main>
 
