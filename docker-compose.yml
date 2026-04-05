@@ -76,6 +76,7 @@ services:
     volumes:
       - ./sync:/app/sync
       - ./tests:/app/tests
+      - ./migrations:/app/migrations
       - ./pyproject.toml:/app/pyproject.toml
       - ./uv.lock:/app/uv.lock
     working_dir: /app
