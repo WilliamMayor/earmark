@@ -1,4 +1,5 @@
-import { RRule } from 'rrule';
+import * as rrule from 'rrule';
+const { RRule } = rrule;
 import type { EnvelopeWithStats } from './types.js';
 
 export type GoalType = 'recurring' | 'one_off' | 'open_ended';
