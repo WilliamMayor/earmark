@@ -26,7 +26,7 @@ export function getAccounts(db: Database.Database = getDb()): AccountWithStats[]
 			a.*,
 			COUNT(CASE
 				WHEN (
-					(t.credit_debit_indicator = 'DBIT' AND t.status IN ('booked', 'pending'))
+					(t.credit_debit_indicator IN ('DBIT', 'CRDT') AND t.status IN ('booked', 'pending'))
 					OR t.status = 'opening_balance'
 				)
 				AND  EXISTS (SELECT 1 FROM splits s WHERE s.transaction_id = t.id AND s.is_round_up = 0)
@@ -38,7 +38,7 @@ export function getAccounts(db: Database.Database = getDb()): AccountWithStats[]
 				)
 				THEN NULL
 				WHEN (
-					(t.credit_debit_indicator = 'DBIT' AND t.status IN ('booked', 'pending'))
+					(t.credit_debit_indicator IN ('DBIT', 'CRDT') AND t.status IN ('booked', 'pending'))
 					OR t.status = 'opening_balance'
 				)
 				THEN 1
@@ -64,7 +64,7 @@ export function getAccount(
 			a.*,
 			COUNT(CASE
 				WHEN (
-					(t.credit_debit_indicator = 'DBIT' AND t.status IN ('booked', 'pending'))
+					(t.credit_debit_indicator IN ('DBIT', 'CRDT') AND t.status IN ('booked', 'pending'))
 					OR t.status = 'opening_balance'
 				)
 				AND  EXISTS (SELECT 1 FROM splits s WHERE s.transaction_id = t.id AND s.is_round_up = 0)
@@ -76,7 +76,7 @@ export function getAccount(
 				)
 				THEN NULL
 				WHEN (
-					(t.credit_debit_indicator = 'DBIT' AND t.status IN ('booked', 'pending'))
+					(t.credit_debit_indicator IN ('DBIT', 'CRDT') AND t.status IN ('booked', 'pending'))
 					OR t.status = 'opening_balance'
 				)
 				THEN 1
@@ -478,7 +478,7 @@ export function getUnallocatedTransactions(
 		FROM transactions t
 		WHERE t.account_id = ?
 		  AND (
-		      (t.credit_debit_indicator = 'DBIT' AND t.status IN ('booked', 'pending'))
+		      (t.credit_debit_indicator IN ('DBIT', 'CRDT') AND t.status IN ('booked', 'pending'))
 		      OR t.status = 'opening_balance'
 		  )
 		  AND NOT (

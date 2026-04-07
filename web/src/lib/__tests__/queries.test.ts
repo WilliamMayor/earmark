@@ -92,10 +92,11 @@ describe('getUnallocatedTransactions', () => {
 		expect(txs).toHaveLength(1);
 	});
 
-	it('excludes CRDT transactions', () => {
+	it('includes CRDT transactions', () => {
 		seedTransaction(db, accountId, { amount: '10.00', creditDebit: 'CRDT', status: 'booked' });
 		const txs = getUnallocatedTransactions(accountId, db);
-		expect(txs).toHaveLength(0);
+		expect(txs).toHaveLength(1);
+		expect(txs[0].credit_debit_indicator).toBe('CRDT');
 	});
 
 	it('includes opening_balance status', () => {

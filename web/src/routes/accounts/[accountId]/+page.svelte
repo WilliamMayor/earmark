@@ -146,7 +146,7 @@
 			{@const envGoalType = inferGoalType(envelope)}
 			{@const remaining = envGoalType !== null ? getRemainingAmount(envelope) : 0}
 			{@const goalAmount = envelope.goal_amount ? parseFloat(envelope.goal_amount) : 0}
-			{@const balance = envGoalType !== null ? envelope.goal_balance : parseFloat(envelope.allocated_total)}
+			{@const balance = envelope.goal_balance}
 			{@const isFunded = envGoalType !== null && remaining === 0}
 			{@const progressPct = envGoalType !== null && goalAmount > 0
 				? Math.min(100, Math.round((envelope.goal_balance / goalAmount) * 100))
@@ -302,7 +302,10 @@
 						<p class="text-xs text-gray-400">{formatDate(tx.date)}</p>
 					</div>
 					<div class="text-right ml-4 shrink-0">
-						<p class="font-bold text-gray-900 font-mono">{formatCurrency(tx.amount, tx.currency)}</p>
+						<p class="font-bold text-gray-900 font-mono"
+						   class:text-red-600={tx.credit_debit_indicator === 'DBIT'}>
+							{tx.credit_debit_indicator === 'DBIT' ? '-' : ''}{formatCurrency(tx.amount, tx.currency)}
+						</p>
 						{#if isMultiSplit && unallocatedSplits.length > 0}
 							<p class="text-xs text-blue-600 font-medium">
 								Next: <span class="font-mono">{formatCurrency(unallocatedSplits[0].amount, tx.currency)}</span>
@@ -322,7 +325,10 @@
 									{:else if split.is_default}
 										<span class="text-xs text-gray-400 shrink-0">Default</span>
 									{/if}
-									<span class="font-medium text-gray-900 font-mono">{formatCurrency(split.amount, tx.currency)}</span>
+									<span class="font-medium text-gray-900 font-mono"
+									      class:text-red-600={tx.credit_debit_indicator === 'DBIT'}>
+										{tx.credit_debit_indicator === 'DBIT' ? '-' : ''}{formatCurrency(split.amount, tx.currency)}
+									</span>
 									{#if split.note}<span class="text-gray-400 truncate">— {split.note}</span>{/if}
 									{#if split.is_allocated && split.envelope_name}
 										<span class="text-green-600 ml-1 shrink-0">{split.envelope_name}</span>

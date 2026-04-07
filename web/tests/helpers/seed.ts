@@ -64,30 +64,32 @@ function insertFixtureData(db: Database.Database) {
 	db.prepare(`INSERT INTO envelopes (account_id, name, sort_order) VALUES (?, 'Transport', 1)`).run(accountId);
 	db.prepare(`INSERT INTO envelopes (account_id, name, sort_order) VALUES (?, 'Eating Out', 2)`).run(accountId);
 
-	// Seed transactions: 3 unallocated debits
+	// Seed transactions: 2 unallocated debits + 1 unallocated credit
 	const insertTx = db.prepare(
 		`INSERT INTO transactions (account_id, date, amount, currency, credit_debit_indicator, status, merchant)
-		 VALUES (?, ?, ?, 'GBP', 'DBIT', 'booked', ?)`
+		 VALUES (?, ?, ?, 'GBP', ?, ?, ?)`
 	);
 
-	insertTx.run(accountId, '2026-03-01', '18.50', 'Tesco Superstore');
+	// tx1: DBIT - Tesco
+	insertTx.run(accountId, '2026-03-01', '18.50', 'DBIT', 'booked', 'Tesco Superstore');
 	// tx id = 1 — add default split
 	const tx1Id = (db.prepare(`SELECT last_insert_rowid() AS id`).get() as { id: number }).id;
 	db.prepare(`INSERT INTO splits (transaction_id, amount, sort_order, is_default, is_round_up) VALUES (?, '18.50', 0, 1, 0)`).run(tx1Id);
 
-	insertTx.run(accountId, '2026-03-10', '32.00', 'Deliveroo');
+	// tx2: DBIT - Deliveroo
+	insertTx.run(accountId, '2026-03-10', '32.00', 'DBIT', 'booked', 'Deliveroo');
 	// tx id = 2 — add default split
 	const tx2Id = (db.prepare(`SELECT last_insert_rowid() AS id`).get() as { id: number }).id;
 	db.prepare(`INSERT INTO splits (transaction_id, amount, sort_order, is_default, is_round_up) VALUES (?, '32.00', 0, 1, 0)`).run(tx2Id);
 
-	// Third transaction — split into two parts (pre-seeded)
-	insertTx.run(accountId, '2026-03-15', '20.00', 'Waitrose');
+	// tx3: DBIT - Waitrose (split into two parts)
+	insertTx.run(accountId, '2026-03-15', '20.00', 'DBIT', 'booked', 'Waitrose');
 	const tx3Id = (db.prepare(`SELECT last_insert_rowid() AS id`).get() as { id: number }).id;
 	db.prepare(`INSERT INTO splits (transaction_id, amount, note, sort_order, is_default, is_round_up) VALUES (?, '12.00', 'Groceries', 0, 0, 0)`).run(tx3Id);
 	db.prepare(`INSERT INTO splits (transaction_id, amount, note, sort_order, is_default, is_round_up) VALUES (?, '8.00', 'Household', 1, 0, 0)`).run(tx3Id);
 
-	// A fourth already-fully-allocated transaction (should NOT appear in queue)
-	insertTx.run(accountId, '2026-03-20', '5.00', 'Bus ticket');
+	// tx4: DBIT - Bus ticket (already allocated, should NOT appear in queue)
+	insertTx.run(accountId, '2026-03-20', '5.00', 'DBIT', 'booked', 'Bus ticket');
 	const tx4Id = (db.prepare(`SELECT last_insert_rowid() AS id`).get() as { id: number }).id;
 	db.prepare(`INSERT INTO splits (transaction_id, amount, sort_order, is_default, is_round_up) VALUES (?, '5.00', 0, 1, 0)`).run(tx4Id);
 	const split4Id = (db.prepare(`SELECT last_insert_rowid() AS id`).get() as { id: number }).id;
