@@ -14,61 +14,44 @@ Refactor complex UI elements into independent components to keep files short and
 
 This project follows a test-driven development (TDD) process. **All test suites must pass before any code is pushed to GitHub.** The CI pipeline will reject PRs with failing tests.
 
-### Workflow
-
-1. **Write tests first** — before implementing or changing functionality, write tests that describe the expected behavior.
-2. **Run tests to see failures** — confirm the tests fail for the right reason.
-3. **Implement the feature** — write the minimum code to make the tests pass.
-4. **Run all tests** — verify nothing is broken.
-5. **Refactor** — clean up the code while keeping tests green.
-6. **Commit and push** — only after all tests pass.
-
 ### Running Tests
 
 All tests should be run using Docker to ensure consistent dependencies. Build the images first, then run the test containers.
 
 #### Web Unit Tests
 
+Test pure functions, utilities, and type logic
+
 ```bash
-docker compose run --rm web-unit
+docker compose run --file docker-compose.dev.yml --rm test-web
 ```
 
 #### Web E2E Tests
 
+Test full user flows in a real browser (Playwright)
+
 ```bash
-docker compose run --rm web-e2e
+docker compose run --file docker-compose.dev.yml --rm test-e2e
 ```
 
-#### Python Tests
+#### Sync Tests
+
+Test sync service, API client, database, and migrations
 
 ```bash
-docker compose run --rm python-tests
+docker compose run --file docker-compose.dev.yml --rm test-sync
 ```
 
 #### Run All Tests
 
 ```bash
-docker compose run --rm web-unit
-docker compose run --rm web-e2e
-docker compose run --rm python-tests
+./scripts/test.sh
 ```
 
-### Test Suites Overview
+## Clean builds
 
-| Suite | Docker Service | Purpose |
-|-------|---------------|---------|
-| **Web Unit Tests** | `web-unit` | Test pure functions, utilities, and type logic |
-| **Web E2E Tests** | `web-e2e` | Test full user flows in a real browser (Playwright) |
-| **Python Tests** | `python-tests` | Test sync service, API client, database, and migrations |
+Run `scripts/clean-build.sh` whenever:
+- Changing the base Node.js image version in the Dockerfile (e.g. `node:24-bookworm-slim`)
+- Adding, removing, or upgrading npm dependencies (`package.json` / `package-lock.json`)
 
-### Pre-Push Checklist
-
-Before pushing any changes, run all test suites:
-
-```bash
-docker compose run --rm web-unit
-docker compose run --rm web-e2e
-docker compose run --rm python-tests
-```
-
-All tests must pass before pushing. The GitHub Actions CI workflow will run all three suites on every PR and block merges if any fail.
+This removes the `web_node_modules` Docker volume, which caches native binaries (e.g. `better-sqlite3`) compiled against a specific Node version. Skipping it after the above changes will cause module version mismatch errors at runtime.
