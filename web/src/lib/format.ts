@@ -57,7 +57,7 @@ export function amountsMatch(a: string, b: string): boolean {
 export function toMinorUnits(amount: string): number {
 	const [intPart, fracPart = ''] = amount.split('.');
 	const pence = fracPart.padEnd(2, '0').slice(0, 2);
-	return parseInt(intPart, 10) * 100 + parseInt(pence, 10);
+	return parseInt(intPart || '0', 10) * 100 + parseInt(pence, 10);
 }
 
 /**

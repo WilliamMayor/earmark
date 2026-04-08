@@ -15,6 +15,12 @@ describe('toMinorUnits', () => {
 	it('handles single decimal place', () => {
 		expect(toMinorUnits('10.5')).toBe(1050);
 	});
+
+	it('handles missing leading zero (e.g. .3 instead of 0.3)', () => {
+		expect(toMinorUnits('.3')).toBe(30);
+		expect(toMinorUnits('.30')).toBe(30);
+		expect(toMinorUnits('.03')).toBe(3);
+	});
 });
 
 describe('fromMinorUnits', () => {
