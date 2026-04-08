@@ -13,6 +13,14 @@ export function formatCurrency(amount: string, currency: string): string {
 }
 
 /**
+ * Format a signed currency amount for display, prefixing debits with '-'.
+ * Amount is an unsigned decimal string; indicator is 'DBIT' or 'CRDT'.
+ */
+export function formatSignedCurrency(amount: string, currency: string, indicator: string): string {
+	return (indicator === 'DBIT' ? '-' : '') + formatCurrency(amount, currency);
+}
+
+/**
  * Format an ISO date string (YYYY-MM-DD) for display.
  */
 export function formatDate(isoDate: string | null): string {
