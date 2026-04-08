@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sumAmounts, amountsMatch, toMinorUnits, fromMinorUnits, formatDate } from '../format.js';
+import { sumAmounts, amountsMatch, toMinorUnits, fromMinorUnits, formatDate, formatSignedCurrency } from '../format.js';
 
 describe('toMinorUnits', () => {
 	it('converts whole numbers', () => {
@@ -57,6 +57,26 @@ describe('amountsMatch', () => {
 	it('does not match different amounts', () => {
 		expect(amountsMatch('10.50', '10.51')).toBe(false);
 		expect(amountsMatch('10.00', '9.99')).toBe(false);
+	});
+});
+
+describe('formatSignedCurrency', () => {
+	it('prefixes debit amounts with a minus sign', () => {
+		expect(formatSignedCurrency('18.50', 'GBP', 'DBIT')).toMatch(/^-/);
+	});
+
+	it('does not prefix credit amounts', () => {
+		expect(formatSignedCurrency('10.00', 'GBP', 'CRDT')).not.toMatch(/^-/);
+	});
+
+	it('includes the formatted amount for debits', () => {
+		const result = formatSignedCurrency('18.50', 'GBP', 'DBIT');
+		expect(result).toContain('18.50');
+	});
+
+	it('includes the formatted amount for credits', () => {
+		const result = formatSignedCurrency('10.00', 'GBP', 'CRDT');
+		expect(result).toContain('10.00');
 	});
 });
 

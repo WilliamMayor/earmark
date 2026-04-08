@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
-	import { formatCurrency, formatDate } from '$lib/format.js';
+	import { formatCurrency, formatDate, formatSignedCurrency } from '$lib/format.js';
 	import { inferGoalType, getRemainingAmount, getEstimatedCompletion } from '$lib/goal-utils.js';
 
 	let { data } = $props();
@@ -304,7 +304,7 @@
 					<div class="text-right ml-4 shrink-0">
 						<p class="font-bold text-gray-900 font-mono"
 						   class:text-red-600={tx.credit_debit_indicator === 'DBIT'}>
-							{tx.credit_debit_indicator === 'DBIT' ? '-' : ''}{formatCurrency(tx.amount, tx.currency)}
+							{formatSignedCurrency(tx.amount, tx.currency, tx.credit_debit_indicator)}
 						</p>
 						{#if isMultiSplit && unallocatedSplits.length > 0}
 							<p class="text-xs text-blue-600 font-medium">
@@ -327,7 +327,7 @@
 									{/if}
 									<span class="font-medium text-gray-900 font-mono"
 									      class:text-red-600={tx.credit_debit_indicator === 'DBIT'}>
-										{tx.credit_debit_indicator === 'DBIT' ? '-' : ''}{formatCurrency(split.amount, tx.currency)}
+										{formatSignedCurrency(split.amount, tx.currency, tx.credit_debit_indicator)}
 									</span>
 									{#if split.note}<span class="text-gray-400 truncate">— {split.note}</span>{/if}
 									{#if split.is_allocated && split.envelope_name}
