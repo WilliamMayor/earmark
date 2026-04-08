@@ -85,6 +85,23 @@ test.describe('Allocation flow', () => {
 		await expect(dock).toContainText('Tesco Superstore');
 	});
 
+	test('allocate button shows the amount being allocated', async ({ page }) => {
+		const url = await getAccountUrl(page);
+		await page.goto(url);
+		// tx1 is Tesco £18.50 DBIT — button should read "Allocate £18.50"
+		const btn = page.getByTestId('allocate-btn').first();
+		await expect(btn).toContainText('Allocate');
+		await expect(btn).toContainText('18.50');
+	});
+
+	test('envelope cards show projected balance in allocation mode', async ({ page }) => {
+		const url = await getAccountUrl(page);
+		await page.goto(url);
+		// At least one envelope card should show the → projected balance indicator
+		const card = page.getByTestId('envelope-card').first();
+		await expect(card.locator('text=→')).toBeVisible();
+	});
+
 	test('envelope cards show balance bar', async ({ page }) => {
 		const url = await getAccountUrl(page);
 		await page.goto(url);
