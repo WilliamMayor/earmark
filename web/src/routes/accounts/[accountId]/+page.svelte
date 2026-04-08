@@ -11,6 +11,14 @@
 	let showAddSplitForm = $state(false);
 	let addSplitAmount = $state('');
 	let addSplitNote = $state('');
+	let selectedSplitId = $state<number | null>(null);
+	const activeSplitId = $derived.by(() => {
+		const splits = data.currentSplits;
+		if (selectedSplitId !== null && splits.some(s => s.id === selectedSplitId && !s.is_allocated)) {
+			return selectedSplitId;
+		}
+		return splits.find(s => !s.is_allocated)?.id ?? null;
+	});
 
 	// Swipe state
 	let touchStartX = $state(0);
@@ -147,6 +155,14 @@
 			{@const remaining = envGoalType !== null ? getRemainingAmount(envelope) : 0}
 			{@const goalAmount = envelope.goal_amount ? parseFloat(envelope.goal_amount) : 0}
 			{@const balance = envelope.goal_balance}
+			{@const unallocatedSplit = (data.mode === 'allocate' && data.currentTx && activeSplitId !== null)
+				? (data.currentSplits.find(s => s.id === activeSplitId) ?? null)
+				: null}
+			{@const projectedBalance = unallocatedSplit && data.currentTx
+				? (data.currentTx.credit_debit_indicator === 'CRDT'
+					? balance + parseFloat(unallocatedSplit.amount)
+					: balance - parseFloat(unallocatedSplit.amount))
+				: null}
 			{@const isFunded = envGoalType !== null && remaining === 0}
 			{@const progressPct = envGoalType !== null && goalAmount > 0
 				? Math.min(100, Math.round((envelope.goal_balance / goalAmount) * 100))
@@ -189,6 +205,9 @@
 						{#if envGoalType !== null}
 							<p class="text-xs text-gray-400">of {formatCurrency(envelope.goal_amount!, account.currency)}</p>
 						{/if}
+						{#if projectedBalance !== null}
+							<p class="text-xs text-gray-400">→ <span class="font-mono">{formatCurrency(projectedBalance.toFixed(2), account.currency)}</span></p>
+						{/if}
 					</div>
 				</div>
 
@@ -217,27 +236,24 @@
 						<span></span>
 					{/if}
 
-					{#if data.mode === 'allocate' && data.currentTx}
-						{@const unallocatedSplit = data.currentSplits.find(s => !s.is_allocated)}
-						{#if unallocatedSplit}
-							<form
-								method="POST"
-								action="?/allocate"
-								use:enhance
-								onclick={(e) => e.stopPropagation()}
+					{#if data.mode === 'allocate' && data.currentTx && unallocatedSplit}
+						<form
+							method="POST"
+							action="?/allocate"
+							use:enhance
+							onclick={(e) => e.stopPropagation()}
+						>
+							<input type="hidden" name="envelope_id" value={envelope.id} />
+							<input type="hidden" name="split_id" value={unallocatedSplit.id} />
+							<input type="hidden" name="current_index" value={data.currentTxIndex} />
+							<button
+								type="submit"
+								class="bg-blue-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-blue-700"
+								data-testid="allocate-btn"
 							>
-								<input type="hidden" name="envelope_id" value={envelope.id} />
-								<input type="hidden" name="split_id" value={unallocatedSplit.id} />
-								<input type="hidden" name="current_index" value={data.currentTxIndex} />
-								<button
-									type="submit"
-									class="bg-blue-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-blue-700"
-									data-testid="allocate-btn"
-								>
-									Allocate
-								</button>
-							</form>
-						{/if}
+								Allocate {formatCurrency(parseFloat(unallocatedSplit.amount).toFixed(2), account.currency)}
+							</button>
+						</form>
 					{/if}
 				</div>
 			</a>
@@ -306,24 +322,35 @@
 						   class:text-red-600={tx.credit_debit_indicator === 'DBIT'}>
 							{formatSignedCurrency(tx.amount, tx.currency, tx.credit_debit_indicator)}
 						</p>
-						{#if isMultiSplit && unallocatedSplits.length > 0}
-							<p class="text-xs text-blue-600 font-medium">
-								Next: <span class="font-mono">{formatCurrency(unallocatedSplits[0].amount, tx.currency)}</span>
-							</p>
-						{/if}
 					</div>
 				</div>
 
 				<!-- Split management -->
 				<div class="mt-2 space-y-2">
 					{#each splits as split (split.id)}
-						<div class="border border-gray-100 rounded-lg p-2 text-sm">
+						{@const isActiveSplit = !split.is_allocated && split.id === activeSplitId}
+						<div
+							class="rounded-lg p-2 text-sm border"
+							class:border-blue-400={isActiveSplit}
+							class:border-gray-100={!isActiveSplit}
+							class:cursor-pointer={!split.is_allocated}
+							onclick={() => { if (!split.is_allocated) selectedSplitId = split.id; }}
+						>
 							<div class="flex items-center justify-between gap-2">
 								<div class="flex items-center gap-2 min-w-0">
+									{#if !split.is_allocated}
+										<div
+											class="shrink-0 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center"
+											class:border-blue-500={isActiveSplit}
+											class:border-gray-300={!isActiveSplit}
+										>
+											{#if isActiveSplit}
+												<div class="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+											{/if}
+										</div>
+									{/if}
 									{#if split.is_round_up}
 										<span class="text-xs text-purple-600 font-medium shrink-0">Round Up</span>
-									{:else if split.is_default}
-										<span class="text-xs text-gray-400 shrink-0">Default</span>
 									{/if}
 									<span class="font-medium text-gray-900 font-mono"
 									      class:text-red-600={tx.credit_debit_indicator === 'DBIT'}>
@@ -338,7 +365,7 @@
 									{#if split.is_default && !split.is_round_up}
 										<button
 											type="button"
-											onclick={() => { showAddSplitForm = !showAddSplitForm; addSplitAmount = ''; addSplitNote = ''; }}
+											onclick={(e) => { e.stopPropagation(); showAddSplitForm = !showAddSplitForm; addSplitAmount = ''; addSplitNote = ''; }}
 											class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded hover:bg-gray-200"
 											data-testid="split-btn"
 										>
@@ -352,7 +379,7 @@
 											<button
 												type="submit"
 												class="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50"
-												onclick={(e) => { if (!confirm('Delete this split?')) e.preventDefault(); }}
+												onclick={(e) => { e.stopPropagation(); if (!confirm('Delete this split?')) e.preventDefault(); }}
 											>
 												Delete
 											</button>
