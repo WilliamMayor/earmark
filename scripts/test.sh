@@ -1,4 +1,4 @@
 #!/bin/sh
 set -eu
 
-docker compose --profile test up
+docker compose --file docker-compose.dev.yml --profile test up

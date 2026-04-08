@@ -1,4 +1,4 @@
 #!/bin/sh
 set -eu
 
-docker compose --profile dev up
+docker compose --file docker-compose.dev.yml up

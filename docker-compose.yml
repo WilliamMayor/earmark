@@ -1,74 +1,9 @@
 services:
-    web-dev:
-        build:
-            context: .
-            dockerfile: Dockerfile
-            target: web-dev
-        profiles: ["dev"]
-        ports:
-            - "5173:5173"
-        environment:
-            DB_PATH: /data/transactions.db
-            ORIGIN: http://localhost:5173
-        volumes:
-            - ./web:/app
-            - web_node_modules:/app/node_modules
-            - ./data:/data
-
-    web-unit:
-        build:
-            context: .
-            dockerfile: Dockerfile
-            target: web-dev
-        profiles: ["test"]
-        volumes:
-            - ./web:/app
-            - web_node_modules:/app/node_modules
-            - ./migrations:/migrations
-        working_dir: /app
-        command: npm test
-
-    web-e2e:
-        build:
-            context: .
-            dockerfile: Dockerfile
-            target: e2e-test
-        profiles: ["test"]
-        working_dir: /app
-        command: npx playwright test
-
-    python-tests:
-        build:
-            context: .
-            dockerfile: Dockerfile
-            target: sync-runtime
-        profiles: ["test"]
-        volumes:
-            - ./sync:/app/sync
-            - ./tests:/app/tests
-            - ./migrations:/app/migrations
-            - ./pyproject.toml:/app/pyproject.toml
-            - ./uv.lock:/app/uv.lock
-        working_dir: /app
-        command: uv run pytest
-
     sync:
         build:
             context: .
             dockerfile: Dockerfile
             target: sync-runtime
-        profiles: ["deploy"]
-        volumes:
-            - ./data:/data
-        environment:
-            DB_PATH: /data/transactions.db
-        env_file:
-            - .env
-        ports:
-            - "8002:8080"
-        restart: unless-stopped
-
-    sync-prod:
         name: sync
         image: localhost:5000/sync:latest
         profiles: ["deploy"]
@@ -80,11 +15,11 @@ services:
             - .env
         restart: unless-stopped
 
-    web-prod:
+    web:
         build:
             context: .
             dockerfile: Dockerfile
-            target: runtime
+            target: web-runtime
         image: localhost:5000/web-prod:latest
         profiles: ["deploy"]
         ports:
@@ -95,6 +30,3 @@ services:
         volumes:
             - /home/deploybot/earmark/data:/data
         restart: unless-stopped
-
-volumes:
-    web_node_modules:
