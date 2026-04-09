@@ -1,3 +1,5 @@
+name: earmark-dev
+
 services:
     web:
         build:

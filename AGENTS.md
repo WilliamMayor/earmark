@@ -48,6 +48,21 @@ docker compose run --file docker-compose.dev.yml --rm test-sync
 ./scripts/test.sh
 ```
 
+## Docker Safety Rules
+
+This server runs **two separate Docker environments** on the same Docker daemon:
+
+- **`earmark-dev`** (project name): devuser's development environment — managed by `docker-compose.dev.yml`
+- **`earmark-prod`** (project name): deploybot's production environment — hands-off
+
+**Rules:**
+- `docker compose down` is safe when run from this directory — project isolation prevents it from affecting production
+- NEVER run `docker stop`, `docker rm`, or `docker kill` by container ID/name — these bypass project isolation and can hit production containers
+- NEVER run `docker system prune` or any bulk cleanup commands
+- Use `docker compose --file docker-compose.dev.yml ps` to inspect dev containers
+- If you see containers from the `earmark-prod` project via `docker ps`, leave them alone
+- Deploying means building and pushing images to `localhost:5000`, NOT restarting containers
+
 ## Clean builds
 
 Run `scripts/clean-build.sh` whenever:
