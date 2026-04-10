@@ -1,6 +1,7 @@
 /**
  * Format a currency amount string for display.
- * Amount is an unsigned decimal string (e.g. "18.50"); currency is an ISO 4217 code.
+ * Amount is a decimal string (e.g. "18.50" or "-75.50"); currency is an ISO 4217 code.
+ * Negative amounts are formatted with a leading minus sign (e.g. "-£75.50").
  */
 export function formatCurrency(amount: string, currency: string): string {
 	const num = parseFloat(amount);

@@ -52,6 +52,7 @@
 			<p class="text-gray-500 text-center py-12">No accounts synced yet.</p>
 		{:else}
 			{#each data.accounts as account (account.id)}
+				{@const bal = parseFloat(account.balance)}
 				<a
 					href="/accounts/{account.id}"
 					class="block bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow"
@@ -72,7 +73,7 @@
 						</div>
 						<div class="flex flex-col items-end gap-1">
 							<span
-								class="text-sm font-semibold {parseFloat(account.balance) < 0 ? 'text-red-600' : 'text-gray-900'}"
+								class="text-sm font-semibold {bal < 0 ? 'text-red-600' : 'text-gray-900'}"
 								data-testid="account-balance"
 							>
 								{formatCurrency(account.balance, account.currency)}
