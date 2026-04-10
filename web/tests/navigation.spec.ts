@@ -43,12 +43,22 @@ test.describe('Global nav — mobile', () => {
     await expect(page.getByRole('navigation', { name: 'Global' })).toBeHidden();
   });
 
+  test('shows EARMARK wordmark on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto('/accounts');
+    const wordmark = page.getByRole('link', { name: 'EARMARK' });
+    await expect(wordmark).toBeVisible();
+    await expect(wordmark).toHaveAttribute('href', '/accounts');
+  });
+
   test('hamburger expands a column of nav links', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('/accounts');
     await page.getByRole('button', { name: 'Open menu' }).click();
     await expect(page.getByRole('navigation', { name: 'Global mobile' })).toBeVisible();
-    await expect(page.getByRole('navigation', { name: 'Global mobile' }).getByRole('link', { name: 'Accounts' })).toBeVisible();
+    const accountsLink = page.getByRole('navigation', { name: 'Global mobile' }).getByRole('link', { name: 'Accounts' });
+    await expect(accountsLink).toBeVisible();
+    await expect(accountsLink).toHaveAttribute('aria-current', 'page');
   });
 
   test('hamburger icon changes to close icon when open', async ({ page }) => {
