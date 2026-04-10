@@ -29,4 +29,11 @@ test.describe('Account list', () => {
 		await page.getByTestId('account-card').first().click();
 		await expect(page).toHaveURL(/\/accounts\/\d+/);
 	});
+
+	test('shows account balance on card', async ({ page }) => {
+		await page.goto('/accounts');
+		const balance = page.getByTestId('account-balance');
+		await expect(balance).toBeVisible();
+		await expect(balance).toContainText('-£75.50');
+	});
 });

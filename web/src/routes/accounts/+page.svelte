@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { formatDate } from '$lib/format.js';
+	import { formatDate, formatCurrency } from '$lib/format.js';
 
 	let { data, form } = $props();
 	let syncing = $state(false);
@@ -70,14 +70,22 @@
 								{/if}
 							</p>
 						</div>
-						{#if account.unallocated_count > 0}
+						<div class="flex flex-col items-end gap-1">
 							<span
-								class="bg-orange-50 text-orange-700 text-xs font-semibold px-2 py-1 rounded-full"
-								data-testid="unallocated-badge"
+								class="text-sm font-semibold {parseFloat(account.balance) < 0 ? 'text-red-600' : 'text-gray-900'}"
+								data-testid="account-balance"
 							>
-								{account.unallocated_count} to allocate
+								{formatCurrency(account.balance, account.currency)}
 							</span>
-						{/if}
+							{#if account.unallocated_count > 0}
+								<span
+									class="bg-orange-50 text-orange-700 text-xs font-semibold px-2 py-1 rounded-full"
+									data-testid="unallocated-badge"
+								>
+									{account.unallocated_count} to allocate
+								</span>
+							{/if}
+						</div>
 					</div>
 				</a>
 			{/each}
