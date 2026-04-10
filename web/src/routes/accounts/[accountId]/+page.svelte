@@ -78,7 +78,7 @@
 </div>
 
 <!-- Envelope list (scrollable, leaves room for dock) -->
-<main class="flex-1 overflow-y-auto p-4 space-y-3 max-w-lg mx-auto w-full"
+<main class="min-h-screen bg-slate-50 p-4 space-y-3 max-w-lg mx-auto w-full"
 	class:pb-48={data.mode === 'allocate'}>
 
 	<!-- New envelope form -->
