@@ -8,6 +8,7 @@ import {
 } from './fixtures.js';
 import {
 	getAccounts,
+	getAccount,
 	setAccountRoundUp,
 	getSplitsWithStatus,
 	allocateSplit,
@@ -507,5 +508,26 @@ describe('getAccounts balance', () => {
 		seedTransaction(db, accountId, { amount: '50.00', creditDebit: 'DBIT', status: 'booked' });
 		const accounts = getAccounts(db);
 		expect(accounts[0].balance).toBe('-50.00');
+	});
+});
+
+// ---------------------------------------------------------------------------
+// getAccount — balance
+// ---------------------------------------------------------------------------
+
+describe('getAccount balance', () => {
+	it('returns "0.00" balance for an account with no transactions', () => {
+		const account = getAccount(accountId, db);
+		expect(account).not.toBeNull();
+		expect(account!.balance).toBe('0.00');
+	});
+
+	it('computes balance correctly for a single account', () => {
+		seedTransaction(db, accountId, { amount: '200.00', creditDebit: 'CRDT', status: 'booked' });
+		seedTransaction(db, accountId, { amount: '75.50', creditDebit: 'DBIT', status: 'booked' });
+
+		const account = getAccount(accountId, db);
+		// 200.00 - 75.50 = 124.50
+		expect(account!.balance).toBe('124.50');
 	});
 });
