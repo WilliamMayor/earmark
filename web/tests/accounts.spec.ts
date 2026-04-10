@@ -32,6 +32,7 @@ test.describe('Account list', () => {
 
 	test('shows account balance on card', async ({ page }) => {
 		await page.goto('/accounts');
+		// Fixture has 4 DBIT transactions (18.50 + 32.00 + 20.00 + 5.00) and no credits → -£75.50
 		const balance = page.getByTestId('account-balance');
 		await expect(balance).toBeVisible();
 		await expect(balance).toContainText('-£75.50');
