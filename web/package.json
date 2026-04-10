@@ -19,7 +19,7 @@
     "rrule": "^2.8.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.44.0",
+    "@playwright/test": "^1.59.1",
     "@sveltejs/adapter-node": "^5.2.0",
     "@sveltejs/kit": "^2.57.1",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
