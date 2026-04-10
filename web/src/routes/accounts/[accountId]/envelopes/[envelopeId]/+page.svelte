@@ -105,13 +105,14 @@
 </svelte:head>
 
 <div class="min-h-screen bg-slate-50 flex flex-col">
+	<!-- Breadcrumb -->
+	<div class="bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-1.5 text-xs" data-testid="breadcrumb">
+		<a href="/accounts/{account.id}" class="text-indigo-600 hover:text-indigo-800 font-medium">Envelopes</a>
+		<span class="text-gray-300">›</span>
+		<span class="text-gray-600 font-medium">{envelope.name}</span>
+	</div>
     <!-- Header -->
     <header class="bg-navy px-4 py-4 flex items-center gap-3">
-        <a href="/accounts/{account.id}" class="text-white/60 hover:text-white" aria-label="Back">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-            </svg>
-        </a>
         <div class="flex-1">
             {#if renamingEnvelope}
                 <form method="POST" action="?/rename_envelope" use:enhance={() => ({ update }) => { update(); renamingEnvelope = false; }}>
