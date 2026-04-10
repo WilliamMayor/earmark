@@ -35,7 +35,11 @@ export function getAccounts(db: Database.Database = getDb()): AccountWithStats[]
 						AND NOT EXISTS (SELECT 1 FROM allocations al WHERE al.split_id = s2.id)
 					)
 				)
-			THEN 1 END) AS unallocated_count
+			THEN 1 END) AS unallocated_count,
+			PRINTF('%.2f',
+				COALESCE(SUM(CASE WHEN t.credit_debit_indicator = 'CRDT' THEN CAST(t.amount AS REAL) ELSE 0 END), 0) -
+				COALESCE(SUM(CASE WHEN t.credit_debit_indicator = 'DBIT' THEN CAST(t.amount AS REAL) ELSE 0 END), 0)
+			) AS balance
 		FROM accounts a
 		LEFT JOIN transactions t ON t.account_id = a.id
 		GROUP BY a.id
