@@ -10,13 +10,7 @@
 	<title>Accounts — EARMARK</title>
 </svelte:head>
 
-<div class="min-h-screen bg-slate-50">
-	<header class="bg-navy px-4 py-4 flex items-center justify-between">
-		<span class="font-mono font-bold uppercase tracking-[3.5px] text-white text-[13px]">EARMARK</span>
-		<span class="font-mono font-bold uppercase tracking-[2px] text-white/40 text-[11px]">Accounts</span>
-	</header>
-
-	<main class="p-4 space-y-3 max-w-lg mx-auto">
+<main class="p-4 space-y-3 max-w-lg mx-auto">
 		<form
 			method="POST"
 			action="?/sync"
@@ -92,4 +86,3 @@
 			{/each}
 		{/if}
 	</main>
-</div>
