@@ -530,4 +530,10 @@ describe('getAccount balance', () => {
 		// 200.00 - 75.50 = 124.50
 		expect(account!.balance).toBe('124.50');
 	});
+
+	it('returns a negative balance string when debits exceed credits', () => {
+		seedTransaction(db, accountId, { amount: '50.00', creditDebit: 'DBIT', status: 'booked' });
+		const account = getAccount(accountId, db);
+		expect(account!.balance).toBe('-50.00');
+	});
 });
