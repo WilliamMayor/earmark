@@ -10,6 +10,7 @@ export interface Account {
 
 export interface AccountWithStats extends Account {
 	unallocated_count: number;
+	balance: string;
 }
 
 export interface Transaction {

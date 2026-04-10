@@ -7,6 +7,7 @@ import {
 	seedEnvelope
 } from './fixtures.js';
 import {
+	getAccounts,
 	setAccountRoundUp,
 	getSplitsWithStatus,
 	allocateSplit,
@@ -477,5 +478,34 @@ describe('getGoalContribution', () => {
 
 		expect(getGoalContribution(envelopeId, '2026-01-01', db)).toBeCloseTo(100);
 		expect(getGoalContribution(envelopeId, '2026-04-01', db)).toBe(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// getAccounts — balance
+// ---------------------------------------------------------------------------
+
+describe('getAccounts balance', () => {
+	it('returns "0.00" balance for an account with no transactions', () => {
+		const accounts = getAccounts(db);
+		expect(accounts).toHaveLength(1);
+		expect(accounts[0].balance).toBe('0.00');
+	});
+
+	it('computes balance as CRDT minus DBIT across all statuses', () => {
+		seedTransaction(db, accountId, { amount: '100.00', creditDebit: 'CRDT', status: 'booked' });
+		seedTransaction(db, accountId, { amount: '30.00', creditDebit: 'DBIT', status: 'booked' });
+		seedTransaction(db, accountId, { amount: '10.00', creditDebit: 'DBIT', status: 'pending' });
+		seedTransaction(db, accountId, { amount: '5.00', creditDebit: 'CRDT', status: 'opening_balance' });
+
+		const accounts = getAccounts(db);
+		// 100.00 + 5.00 - 30.00 - 10.00 = 65.00
+		expect(accounts[0].balance).toBe('65.00');
+	});
+
+	it('returns a negative balance string when debits exceed credits', () => {
+		seedTransaction(db, accountId, { amount: '50.00', creditDebit: 'DBIT', status: 'booked' });
+		const accounts = getAccounts(db);
+		expect(accounts[0].balance).toBe('-50.00');
 	});
 });
