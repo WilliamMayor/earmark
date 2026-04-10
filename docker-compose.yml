@@ -6,8 +6,7 @@ services:
             context: .
             dockerfile: Dockerfile
             target: sync-runtime
-        name: sync
-        image: localhost:5000/sync:latest
+        image: localhost:5000/earmark/sync:latest
         profiles: ["deploy"]
         volumes:
             - /home/deploybot/earmark/data:/data
@@ -22,7 +21,7 @@ services:
             context: .
             dockerfile: Dockerfile
             target: web-runtime
-        image: localhost:5000/web-prod:latest
+        image: localhost:5000/earmark/web:latest
         profiles: ["deploy"]
         ports:
             - "8090:3000"
