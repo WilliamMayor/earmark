@@ -128,6 +128,7 @@ test.describe('Envelope breadcrumb', () => {
   test('breadcrumb Envelopes link navigates back to account', async ({ page }) => {
     await page.goto('/accounts');
     await page.getByTestId('account-card').first().click();
+    await page.waitForURL(/\/accounts\/\d+$/);
     const accountUrl = page.url();
     await page.getByTestId('envelope-card').first().click();
     await page.getByTestId('breadcrumb').getByRole('link', { name: 'Envelopes' }).click();
