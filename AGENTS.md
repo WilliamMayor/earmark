@@ -10,6 +10,10 @@ We use tailwindCSS for styling. Don't use any custom CSS, only use tailwind clas
 
 Refactor complex UI elements into independent components to keep files short and focused.
 
+## Design & Spec Files
+
+Spec and design documents (e.g. from brainstorming sessions) should be written to the `docs/` folder. The `docs/` folder is listed in `.gitignore` and should **not** be committed to git.
+
 ## Test-Driven Development
 
 This project follows a test-driven development (TDD) process. **All test suites must pass before any code is pushed to GitHub.** The CI pipeline will reject PRs with failing tests.
