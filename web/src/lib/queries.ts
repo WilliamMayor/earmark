@@ -7,6 +7,7 @@ import {
 	TransactionValidationError,
 	WithdrawalAlreadyAllocatedError,
 	type AccountWithStats,
+	type EnvelopeWithdrawal,
 	type EnvelopeWithStats,
 	type Split,
 	type SplitWithStatus,
@@ -512,6 +513,31 @@ export function allocateWithdrawal(
 
     db.prepare(`UPDATE envelope_withdrawals SET to_envelope_id = ? WHERE id = ?`)
         .run(toEnvelopeId, withdrawalId);
+}
+
+export function getUnallocatedWithdrawals(
+    accountId: number,
+    db: Database.Database = getDb()
+): EnvelopeWithdrawal[] {
+    return db
+        .prepare(
+            `
+        SELECT
+            w.id,
+            w.from_envelope_id,
+            e.name AS from_envelope_name,
+            w.to_envelope_id,
+            w.amount,
+            w.note,
+            w.created_at
+        FROM envelope_withdrawals w
+        JOIN envelopes e ON e.id = w.from_envelope_id
+        WHERE w.to_envelope_id IS NULL
+          AND e.account_id = ?
+        ORDER BY w.created_at DESC
+        `
+        )
+        .all(accountId) as EnvelopeWithdrawal[];
 }
 
 // ---------------------------------------------------------------------------
