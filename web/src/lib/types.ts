@@ -65,6 +65,16 @@ export interface SplitWithStatus extends Split {
 	envelope_name: string | null;
 }
 
+export interface EnvelopeWithdrawal {
+	id: number;
+	from_envelope_id: number;
+	from_envelope_name: string;
+	to_envelope_id: number | null;
+	amount: string;
+	note: string | null;
+	created_at: string;
+}
+
 export class SplitValidationError extends Error {
 	constructor(message: string) {
 		super(message);
@@ -76,6 +86,13 @@ export class AlreadyAllocatedError extends Error {
 	constructor(splitId: number) {
 		super(`Split ${splitId} is already allocated`);
 		this.name = 'AlreadyAllocatedError';
+	}
+}
+
+export class WithdrawalAlreadyAllocatedError extends Error {
+	constructor(withdrawalId: number) {
+		super(`Withdrawal ${withdrawalId} is already allocated`);
+		this.name = 'WithdrawalAlreadyAllocatedError';
 	}
 }
 
