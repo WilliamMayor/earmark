@@ -27,7 +27,8 @@ import {
 	getTransactions,
 	createTransaction,
 	createWithdrawal,
-	allocateWithdrawal
+	allocateWithdrawal,
+	getUnallocatedWithdrawals
 } from '../queries.js';
 import {
 	AlreadyAllocatedError,
@@ -744,5 +745,56 @@ describe('allocateWithdrawal', () => {
 
         allocateWithdrawal(withdrawalId, toId, db);
         expect(() => allocateWithdrawal(withdrawalId, toId, db)).toThrow(WithdrawalAlreadyAllocatedError);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// getUnallocatedWithdrawals
+// ---------------------------------------------------------------------------
+
+describe('getUnallocatedWithdrawals', () => {
+    it('returns withdrawals where to_envelope_id is null', () => {
+        const envelopeId = seedEnvelope(db, accountId, 'Savings');
+        seedWithdrawal(db, envelopeId, { amount: '50.00' });
+
+        const results = getUnallocatedWithdrawals(accountId, db);
+        expect(results).toHaveLength(1);
+        expect(results[0].amount).toBe('50.00');
+        expect(results[0].to_envelope_id).toBeNull();
+        expect(results[0].from_envelope_name).toBe('Savings');
+    });
+
+    it('excludes withdrawals that have been allocated', () => {
+        const fromId = seedEnvelope(db, accountId, 'Savings');
+        const toId = seedEnvelope(db, accountId, 'Petrol');
+        const withdrawalId = seedWithdrawal(db, fromId, { amount: '50.00' });
+        allocateWithdrawal(withdrawalId, toId, db);
+
+        const results = getUnallocatedWithdrawals(accountId, db);
+        expect(results).toHaveLength(0);
+    });
+
+    it('does not return withdrawals from other accounts', () => {
+        const otherAccountId = seedAccount(db, { institutionName: 'Other Bank' });
+        const otherEnvelopeId = seedEnvelope(db, otherAccountId, 'Other');
+        seedWithdrawal(db, otherEnvelopeId, { amount: '20.00' });
+
+        const results = getUnallocatedWithdrawals(accountId, db);
+        expect(results).toHaveLength(0);
+    });
+
+    it('returns multiple withdrawals ordered newest first', () => {
+        const envelopeId = seedEnvelope(db, accountId, 'Savings');
+        db.prepare(
+            `INSERT INTO envelope_withdrawals (from_envelope_id, amount, created_at) VALUES (?, '10.00', '2026-04-01T10:00:00')`
+        ).run(envelopeId);
+        db.prepare(
+            `INSERT INTO envelope_withdrawals (from_envelope_id, amount, created_at) VALUES (?, '20.00', '2026-04-02T10:00:00')`
+        ).run(envelopeId);
+
+        const results = getUnallocatedWithdrawals(accountId, db);
+        expect(results).toHaveLength(2);
+        expect(results[0].amount).toBe('20.00');
+        expect(results[1].amount).toBe('10.00');
     });
 });
