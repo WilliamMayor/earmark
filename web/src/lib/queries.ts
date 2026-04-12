@@ -129,7 +129,10 @@ export function getEnvelopes(
 					WHEN t.credit_debit_indicator = 'DBIT' THEN -CAST(s.amount AS REAL)
 					ELSE 0
 				END
-			), 0) AS goal_balance
+			), 0)
+			- COALESCE((SELECT SUM(CAST(w.amount AS REAL)) FROM envelope_withdrawals w WHERE w.from_envelope_id = e.id), 0)
+			+ COALESCE((SELECT SUM(CAST(w.amount AS REAL)) FROM envelope_withdrawals w WHERE w.to_envelope_id = e.id), 0)
+			AS goal_balance
 		FROM envelopes e
 		LEFT JOIN allocations al ON al.envelope_id = e.id
 		LEFT JOIN splits s ON s.id = al.split_id
@@ -185,7 +188,10 @@ export function getEnvelope(
 					WHEN t.credit_debit_indicator = 'DBIT' THEN -CAST(s.amount AS REAL)
 					ELSE 0
 				END
-			), 0) AS goal_balance
+			), 0)
+			- COALESCE((SELECT SUM(CAST(w.amount AS REAL)) FROM envelope_withdrawals w WHERE w.from_envelope_id = e.id), 0)
+			+ COALESCE((SELECT SUM(CAST(w.amount AS REAL)) FROM envelope_withdrawals w WHERE w.to_envelope_id = e.id), 0)
+			AS goal_balance
 		FROM envelopes e
 		LEFT JOIN allocations al ON al.envelope_id = e.id
 		LEFT JOIN splits s ON s.id = al.split_id
