@@ -26,13 +26,15 @@ import {
 	getGoalContribution,
 	getTransactions,
 	createTransaction,
-	createWithdrawal
+	createWithdrawal,
+	allocateWithdrawal
 } from '../queries.js';
 import {
 	AlreadyAllocatedError,
 	EnvelopeHasAllocationsError,
 	SplitValidationError,
-	TransactionValidationError
+	TransactionValidationError,
+	WithdrawalAlreadyAllocatedError
 } from '../types.js';
 
 let db: Database.Database;
@@ -714,5 +716,33 @@ describe('createWithdrawal', () => {
     it('throws SplitValidationError when amount is negative', () => {
         const envelopeId = seedEnvelope(db, accountId, 'Savings');
         expect(() => createWithdrawal(envelopeId, '-5.00', null, db)).toThrow(SplitValidationError);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// allocateWithdrawal
+// ---------------------------------------------------------------------------
+
+describe('allocateWithdrawal', () => {
+    it('sets to_envelope_id on the withdrawal', () => {
+        const fromId = seedEnvelope(db, accountId, 'Savings');
+        const toId = seedEnvelope(db, accountId, 'Petrol');
+        const withdrawalId = seedWithdrawal(db, fromId, { amount: '50.00' });
+
+        allocateWithdrawal(withdrawalId, toId, db);
+
+        const row = db
+            .prepare(`SELECT to_envelope_id FROM envelope_withdrawals WHERE id = ?`)
+            .get(withdrawalId) as { to_envelope_id: number };
+        expect(row.to_envelope_id).toBe(toId);
+    });
+
+    it('throws WithdrawalAlreadyAllocatedError when already allocated', () => {
+        const fromId = seedEnvelope(db, accountId, 'Savings');
+        const toId = seedEnvelope(db, accountId, 'Petrol');
+        const withdrawalId = seedWithdrawal(db, fromId, { amount: '50.00' });
+
+        allocateWithdrawal(withdrawalId, toId, db);
+        expect(() => allocateWithdrawal(withdrawalId, toId, db)).toThrow(WithdrawalAlreadyAllocatedError);
     });
 });
