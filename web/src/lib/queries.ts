@@ -518,7 +518,13 @@ export function createTransaction(
 		)
 		.run(accountId, resolvedDate, amount, account.currency, indicator, description, merchant);
 
-	return result.lastInsertRowid as number;
+	const txId = result.lastInsertRowid as number;
+
+	db.prepare(
+		`INSERT INTO splits (transaction_id, amount, sort_order, is_default) VALUES (?, ?, 0, 1)`
+	).run(txId, amount);
+
+	return txId;
 }
 
 export function getUnallocatedTransactions(
