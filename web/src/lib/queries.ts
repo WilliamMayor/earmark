@@ -5,6 +5,7 @@ import {
 	EnvelopeHasAllocationsError,
 	SplitValidationError,
 	TransactionValidationError,
+	WithdrawalAlreadyAllocatedError,
 	type AccountWithStats,
 	type EnvelopeWithStats,
 	type Split,
@@ -494,6 +495,23 @@ export function createWithdrawal(
         )
         .run(fromEnvelopeId, amount, note);
     return result.lastInsertRowid as number;
+}
+
+export function allocateWithdrawal(
+    withdrawalId: number,
+    toEnvelopeId: number,
+    db: Database.Database = getDb()
+): void {
+    const existing = db
+        .prepare(`SELECT to_envelope_id FROM envelope_withdrawals WHERE id = ?`)
+        .get(withdrawalId) as { to_envelope_id: number | null } | null;
+
+    if (existing?.to_envelope_id !== null && existing?.to_envelope_id !== undefined) {
+        throw new WithdrawalAlreadyAllocatedError(withdrawalId);
+    }
+
+    db.prepare(`UPDATE envelope_withdrawals SET to_envelope_id = ? WHERE id = ?`)
+        .run(toEnvelopeId, withdrawalId);
 }
 
 // ---------------------------------------------------------------------------
