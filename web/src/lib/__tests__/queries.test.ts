@@ -181,6 +181,20 @@ describe('getEnvelopes', () => {
 		const envelopes = getEnvelopes(accountId, db);
 		expect(envelopes[0].allocated_raw).toBe(0);
 	});
+
+	it('subtracts outgoing withdrawals from goal_balance', () => {
+		const fromId = seedEnvelope(db, accountId, 'Savings');
+		const txId = seedTransaction(db, accountId, { amount: '100.00', creditDebit: 'CRDT' });
+		db.prepare(`INSERT INTO splits (transaction_id, amount, sort_order) VALUES (?, '100.00', 0)`).run(txId);
+		const split = db.prepare(`SELECT id FROM splits WHERE transaction_id = ?`).get(txId) as { id: number };
+		allocateSplit(fromId, split.id, db);
+
+		seedWithdrawal(db, fromId, { amount: '30.00' });
+
+		const envelopes = getEnvelopes(accountId, db);
+		const savings = envelopes.find(e => e.id === fromId)!;
+		expect(savings.goal_balance).toBeCloseTo(70);
+	});
 });
 
 // ---------------------------------------------------------------------------
@@ -424,6 +438,39 @@ describe('getEnvelope', () => {
 
 		const envelope = getEnvelope(envelopeId, db);
 		expect(envelope!.goal_balance).toBeCloseTo(30);
+	});
+
+	it('subtracts outgoing withdrawals from goal_balance immediately', () => {
+		const fromId = seedEnvelope(db, accountId, 'Savings');
+		const txId = seedTransaction(db, accountId, { amount: '100.00', creditDebit: 'CRDT' });
+		db.prepare(`INSERT INTO splits (transaction_id, amount, sort_order) VALUES (?, '100.00', 0)`).run(txId);
+		const split = db.prepare(`SELECT id FROM splits WHERE transaction_id = ?`).get(txId) as { id: number };
+		allocateSplit(fromId, split.id, db);
+
+		// Withdraw 40 — not yet allocated to a destination
+		seedWithdrawal(db, fromId, { amount: '40.00' });
+
+		const envelope = getEnvelope(fromId, db);
+		expect(envelope!.goal_balance).toBeCloseTo(60);
+	});
+
+	it('adds incoming allocated withdrawals to goal_balance', () => {
+		const fromId = seedEnvelope(db, accountId, 'Savings');
+		const toId = seedEnvelope(db, accountId, 'Petrol');
+		const withdrawalId = seedWithdrawal(db, fromId, { amount: '50.00' });
+		allocateWithdrawal(withdrawalId, toId, db);
+
+		const envelope = getEnvelope(toId, db);
+		expect(envelope!.goal_balance).toBeCloseTo(50);
+	});
+
+	it('does not add unallocated withdrawals to destination', () => {
+		const fromId = seedEnvelope(db, accountId, 'Savings');
+		const toId = seedEnvelope(db, accountId, 'Petrol');
+		seedWithdrawal(db, fromId, { amount: '50.00' });
+
+		const envelope = getEnvelope(toId, db);
+		expect(envelope!.goal_balance).toBeCloseTo(0);
 	});
 });
 
