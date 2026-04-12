@@ -647,4 +647,31 @@ describe('createTransaction', () => {
 		expect(() => createTransaction(accountId, 'abc', 'Test', null, null, db))
 			.toThrow(TransactionValidationError);
 	});
+
+	it('creates a default split matching the transaction amount', () => {
+		const txId = createTransaction(accountId, '-18.50', 'Dinner', '2026-04-01', null, db);
+		const split = db
+			.prepare(`SELECT * FROM splits WHERE transaction_id = ? AND is_default = 1`)
+			.get(txId) as { amount: string; is_default: number } | undefined;
+		expect(split).toBeDefined();
+		expect(split!.amount).toBe('18.50');
+		expect(split!.is_default).toBe(1);
+	});
+
+	it('creates exactly one default split', () => {
+		const txId = createTransaction(accountId, '-10.00', 'Test', '2026-04-01', null, db);
+		const splits = db
+			.prepare(`SELECT * FROM splits WHERE transaction_id = ?`)
+			.all(txId) as Array<unknown>;
+		expect(splits).toHaveLength(1);
+	});
+
+	it('creates a default split for CRDT transactions too', () => {
+		const txId = createTransaction(accountId, '500.00', 'Salary', '2026-04-01', null, db);
+		const split = db
+			.prepare(`SELECT * FROM splits WHERE transaction_id = ? AND is_default = 1`)
+			.get(txId) as { amount: string } | undefined;
+		expect(split).toBeDefined();
+		expect(split!.amount).toBe('500.00');
+	});
 });
