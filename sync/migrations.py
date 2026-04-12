@@ -58,11 +58,12 @@ def run_migrations(
     ran: list[str] = []
 
     for path in _migration_files(migrations_dir):
+        print(path.name)
         if path.name in applied:
             continue
 
         sql = path.read_text()
-        statements = _split_statements(sql)
+        pragmas, statements = _split_statements(sql)
 
         try:
             # Use explicit SQL BEGIN/COMMIT rather than conn.commit()/rollback().
@@ -70,6 +71,11 @@ def run_migrations(
             # etc.) before Python-level transaction management can protect them.
             # Explicit SQL transactions bypass that behaviour — SQLite's own DDL
             # is fully transactional, so a ROLLBACK here undoes schema changes too.
+            #
+            # PRAGMA statements must run outside a transaction, so we execute them
+            # before BEGIN and track any that need to be restored on failure.
+            for pragma in pragmas:
+                conn.execute(pragma)
             conn.execute("BEGIN")
             for statement in statements:
                 conn.execute(statement)
@@ -82,6 +88,10 @@ def run_migrations(
         except Exception as exc:
             conn.execute("ROLLBACK")
             raise RuntimeError(f"Migration {path.name!r} failed: {exc}") from exc
+        finally:
+            # Restore safe defaults after any PRAGMA changes made pre-transaction.
+            if any(re.search(r"foreign_keys", p, re.IGNORECASE) for p in pragmas):
+                conn.execute("PRAGMA foreign_keys = ON")
 
     return ran
 
@@ -105,13 +115,46 @@ def _migration_files(migrations_dir: Path) -> list[Path]:
     return sorted(migrations_dir.glob("*.sql"), key=lambda p: p.name)
 
 
-def _split_statements(sql: str) -> list[str]:
+_TRANSACTION_CONTROL_RE = re.compile(
+    r"^(BEGIN|COMMIT|ROLLBACK)(\s+\w+)*$", re.IGNORECASE
+)
+_PRAGMA_RE = re.compile(r"^PRAGMA\s+", re.IGNORECASE)
+
+
+def _split_statements(sql: str) -> tuple[list[str], list[str]]:
     """
-    Split a SQL string into individual statements, stripping comments.
-    Simple but sufficient for DDL-only migration files.
+    Split a SQL string into (pragmas, statements).
+
+    Transaction-control statements (BEGIN, COMMIT, ROLLBACK) are filtered out
+    because the runner manages its own transaction.
+
+    PRAGMA statements must run outside a transaction, so they are returned
+    separately as `pragmas` to be executed before BEGIN. Only the first
+    occurrence of each PRAGMA key is kept (the "before" pragma); the mirrored
+    "after" pragma in the migration file is deduplicated away.
     """
     # Strip -- line comments
     sql = re.sub(r"--[^\n]*", "", sql)
     # Strip /* */ block comments
     sql = re.sub(r"/\*.*?\*/", "", sql, flags=re.DOTALL)
-    return [s.strip() for s in sql.split(";") if s.strip()]
+    all_statements = [s.strip() for s in sql.split(";") if s.strip()]
+
+    pragmas: list[str] = []
+    seen_pragma_keys: set[str] = set()
+    statements: list[str] = []
+
+    for s in all_statements:
+        if _TRANSACTION_CONTROL_RE.match(s):
+            continue
+        if _PRAGMA_RE.match(s):
+            # Deduplicate by the pragma key (e.g. "foreign_keys") so the
+            # opening "= OFF" is kept and the closing "= ON" is not re-added.
+            key_match = re.match(r"PRAGMA\s+(\w+)", s, re.IGNORECASE)
+            key = key_match.group(1).lower() if key_match else s
+            if key not in seen_pragma_keys:
+                seen_pragma_keys.add(key)
+                pragmas.append(s)
+        else:
+            statements.append(s)
+
+    return pragmas, statements

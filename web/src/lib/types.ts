@@ -1,6 +1,6 @@
 export interface Account {
 	id: number;
-	lunchflow_id: number;
+	lunchflow_id: number | null;
 	institution_name: string;
 	name: string | null;
 	currency: string;
@@ -83,5 +83,12 @@ export class EnvelopeHasAllocationsError extends Error {
 	constructor(envelopeId: number) {
 		super(`Envelope ${envelopeId} has allocations and cannot be deleted`);
 		this.name = 'EnvelopeHasAllocationsError';
+	}
+}
+
+export class TransactionValidationError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'TransactionValidationError';
 	}
 }

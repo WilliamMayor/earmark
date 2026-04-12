@@ -34,10 +34,15 @@ EXPOSE 5173
 CMD ["npm", "run", "dev", "--", "--host"]
 
 # Stage 5: Playwright e2e test runner with all dependencies
-FROM deps AS test-e2e
+FROM mcr.microsoft.com/playwright:v1.59.1-noble AS test-e2e
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
 COPY web/ .
-COPY migrations/ /migrations/
-RUN npx playwright install --with-deps chromium
+COPY migrations/ ./migrations/
 CMD ["npx", "playwright", "test"]
 
 # Stage 6: long-running FastAPI sync service
@@ -46,5 +51,6 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --no-dev --frozen
 COPY sync/ ./sync/
-COPY migrations/ /migrations/
-CMD ["uv", "run", "python", "-m", "sync"]
+COPY migrations/ ./migrations/
+COPY migrate.py ./
+CMD ["uv", "run", "--no-dev", "python", "-m", "sync"]

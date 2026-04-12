@@ -4,6 +4,7 @@ import {
 	AlreadyAllocatedError,
 	EnvelopeHasAllocationsError,
 	SplitValidationError,
+	TransactionValidationError,
 	type AccountWithStats,
 	type EnvelopeWithStats,
 	type Split,
@@ -83,6 +84,21 @@ export function getAccount(
 			)
 			.get(id) as AccountWithStats | null) ?? null
 	);
+}
+
+export function createAccount(
+	institutionName: string,
+	name: string | null,
+	currency: string,
+	db: Database.Database = getDb()
+): number {
+	const result = db
+		.prepare(
+			`INSERT INTO accounts (lunchflow_id, institution_name, name, currency)
+			 VALUES (NULL, ?, ?, ?)`
+		)
+		.run(institutionName, name, currency);
+	return result.lastInsertRowid as number;
 }
 
 // ---------------------------------------------------------------------------
@@ -460,6 +476,50 @@ export function allocateSplit(
 // ---------------------------------------------------------------------------
 // Unallocated transaction queue
 // ---------------------------------------------------------------------------
+
+export function getTransactions(
+	accountId: number,
+	db: Database.Database = getDb()
+): Transaction[] {
+	return db
+		.prepare(
+			`SELECT * FROM transactions
+			 WHERE account_id = ?
+			 ORDER BY date DESC, id DESC`
+		)
+		.all(accountId) as Transaction[];
+}
+
+export function createTransaction(
+	accountId: number,
+	amountStr: string,
+	description: string,
+	date: string | null,
+	merchant: string | null,
+	db: Database.Database = getDb()
+): number {
+	const value = parseFloat(amountStr);
+	if (!isFinite(value)) throw new TransactionValidationError('Invalid amount');
+
+	const indicator: 'DBIT' | 'CRDT' = value < 0 ? 'DBIT' : 'CRDT';
+	const amount = Math.abs(value).toFixed(2);
+	const resolvedDate = date ?? new Date().toISOString().slice(0, 10);
+
+	const account = db
+		.prepare(`SELECT currency FROM accounts WHERE id = ?`)
+		.get(accountId) as { currency: string } | null;
+	if (!account) throw new TransactionValidationError('Account not found');
+
+	const result = db
+		.prepare(
+			`INSERT INTO transactions
+			 (account_id, date, amount, currency, credit_debit_indicator, status, description, merchant, lunchflow_id)
+			 VALUES (?, ?, ?, ?, ?, 'booked', ?, ?, NULL)`
+		)
+		.run(accountId, resolvedDate, amount, account.currency, indicator, description, merchant);
+
+	return result.lastInsertRowid as number;
+}
 
 export function getUnallocatedTransactions(
 	accountId: number,

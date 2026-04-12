@@ -20,11 +20,8 @@
         {data.account.institution_name} - {data.account.name}
     </h2>
     <nav class="flex flex-col sm:flex-row text-sm gap-1" aria-label="Account">
-        <NavItem
-            path={accountBase}
-            name="Envelopes"
-            data-testid="tab-envelopes"
-        />
+        <NavItem path={accountBase} name="Envelopes" data-testid="tab-envelopes" />
+        <NavItem path={accountBase + "/transactions"} name="Transactions" data-testid="tab-transactions" />
         <NavItem path={accountBase + "/settings"} name="Settings" />
     </nav>
 </div>

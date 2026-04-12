@@ -113,7 +113,7 @@ test.describe('Allocation flow', () => {
 		const url = await getAccountUrl(page);
 		await page.goto(url);
 
-		await page.getByTestId('new-envelope-btn').click();
+		await page.getByTestId('expander-btn').click();
 		await page.getByLabel('Envelope name').fill('Rent');
 		await page.getByRole('button', { name: 'Create' }).click();
 

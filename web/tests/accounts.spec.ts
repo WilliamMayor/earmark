@@ -38,3 +38,17 @@ test.describe('Account list', () => {
 		await expect(balance).toContainText('-£75.50');
 	});
 });
+
+test.describe('Manual account creation', () => {
+	test('creates a new manual account from the accounts list', async ({ page }) => {
+		await page.goto('/accounts');
+
+		await page.getByRole('button', { name: '+ New account' }).click();
+		await page.getByLabel('Institution name').fill('Cash');
+		await page.getByLabel('Account name').fill('Wallet');
+		await page.getByRole('button', { name: 'Create' }).click();
+
+		await expect(page).toHaveURL('/accounts');
+		await expect(page.getByTestId('account-card').filter({ hasText: 'Cash' })).toBeVisible();
+	});
+});
