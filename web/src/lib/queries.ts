@@ -474,6 +474,29 @@ export function allocateSplit(
 }
 
 // ---------------------------------------------------------------------------
+// Envelope Withdrawals
+// ---------------------------------------------------------------------------
+
+export function createWithdrawal(
+    fromEnvelopeId: number,
+    amount: string,
+    note: string | null,
+    db: Database.Database = getDb()
+): number {
+    const minor = toMinorUnits(amount);
+    if (minor <= 0) {
+        throw new SplitValidationError('Withdrawal amount must be greater than 0');
+    }
+    const result = db
+        .prepare(
+            `INSERT INTO envelope_withdrawals (from_envelope_id, to_envelope_id, amount, note)
+             VALUES (?, NULL, ?, ?)`
+        )
+        .run(fromEnvelopeId, amount, note);
+    return result.lastInsertRowid as number;
+}
+
+// ---------------------------------------------------------------------------
 // Unallocated transaction queue
 // ---------------------------------------------------------------------------
 

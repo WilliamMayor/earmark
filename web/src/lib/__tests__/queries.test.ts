@@ -4,7 +4,8 @@ import {
 	createTestDb,
 	seedAccount,
 	seedTransaction,
-	seedEnvelope
+	seedEnvelope,
+	seedWithdrawal
 } from './fixtures.js';
 import {
 	getAccounts,
@@ -24,7 +25,8 @@ import {
 	removeGoal,
 	getGoalContribution,
 	getTransactions,
-	createTransaction
+	createTransaction,
+	createWithdrawal
 } from '../queries.js';
 import {
 	AlreadyAllocatedError,
@@ -674,4 +676,43 @@ describe('createTransaction', () => {
 		expect(split).toBeDefined();
 		expect(split!.amount).toBe('500.00');
 	});
+});
+
+// ---------------------------------------------------------------------------
+// createWithdrawal
+// ---------------------------------------------------------------------------
+
+describe('createWithdrawal', () => {
+    it('inserts a row with to_envelope_id = null', () => {
+        const envelopeId = seedEnvelope(db, accountId, 'Savings');
+        createWithdrawal(envelopeId, '50.00', null, db);
+
+        const row = db
+            .prepare(`SELECT * FROM envelope_withdrawals WHERE from_envelope_id = ?`)
+            .get(envelopeId) as { amount: string; to_envelope_id: null; note: null };
+        expect(row).toBeDefined();
+        expect(row.amount).toBe('50.00');
+        expect(row.to_envelope_id).toBeNull();
+        expect(row.note).toBeNull();
+    });
+
+    it('stores an optional note', () => {
+        const envelopeId = seedEnvelope(db, accountId, 'Savings');
+        createWithdrawal(envelopeId, '30.00', 'Cover petrol', db);
+
+        const row = db
+            .prepare(`SELECT note FROM envelope_withdrawals WHERE from_envelope_id = ?`)
+            .get(envelopeId) as { note: string };
+        expect(row.note).toBe('Cover petrol');
+    });
+
+    it('throws SplitValidationError when amount is zero', () => {
+        const envelopeId = seedEnvelope(db, accountId, 'Savings');
+        expect(() => createWithdrawal(envelopeId, '0.00', null, db)).toThrow(SplitValidationError);
+    });
+
+    it('throws SplitValidationError when amount is negative', () => {
+        const envelopeId = seedEnvelope(db, accountId, 'Savings');
+        expect(() => createWithdrawal(envelopeId, '-5.00', null, db)).toThrow(SplitValidationError);
+    });
 });
