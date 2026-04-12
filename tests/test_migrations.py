@@ -231,4 +231,18 @@ def test_real_migrations_idempotent(conn):
     ("   ;   ;   ", 0),  # empty statements ignored
 ])
 def test_split_statements(sql, expected_count):
-    assert len(_split_statements(sql)) == expected_count
+    _, statements = _split_statements(sql)
+    assert len(statements) == expected_count
+
+
+def test_split_statements_separates_pragmas():
+    sql = "PRAGMA foreign_keys = OFF;\nCREATE TABLE a (id INTEGER);\nPRAGMA foreign_keys = ON;"
+    pragmas, statements = _split_statements(sql)
+    assert pragmas == ["PRAGMA foreign_keys = OFF"]
+    assert statements == ["CREATE TABLE a (id INTEGER)"]
+
+
+def test_split_statements_filters_transaction_control():
+    sql = "BEGIN;\nCREATE TABLE a (id INTEGER);\nCOMMIT;"
+    _, statements = _split_statements(sql)
+    assert statements == ["CREATE TABLE a (id INTEGER)"]
