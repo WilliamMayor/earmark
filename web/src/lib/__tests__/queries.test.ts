@@ -9,6 +9,7 @@ import {
 import {
 	getAccounts,
 	getAccount,
+	createAccount,
 	setAccountRoundUp,
 	getSplitsWithStatus,
 	allocateSplit,
@@ -21,12 +22,15 @@ import {
 	getEnvelope,
 	setGoal,
 	removeGoal,
-	getGoalContribution
+	getGoalContribution,
+	getTransactions,
+	createTransaction
 } from '../queries.js';
 import {
 	AlreadyAllocatedError,
 	EnvelopeHasAllocationsError,
-	SplitValidationError
+	SplitValidationError,
+	TransactionValidationError
 } from '../types.js';
 
 let db: Database.Database;
@@ -483,6 +487,34 @@ describe('getGoalContribution', () => {
 });
 
 // ---------------------------------------------------------------------------
+// createAccount
+// ---------------------------------------------------------------------------
+
+describe('createAccount', () => {
+	it('creates an account with null lunchflow_id', () => {
+		const id = createAccount('Starling', 'Savings', 'GBP', db);
+		const account = getAccount(id, db);
+		expect(account).not.toBeNull();
+		expect(account!.lunchflow_id).toBeNull();
+		expect(account!.institution_name).toBe('Starling');
+		expect(account!.name).toBe('Savings');
+		expect(account!.currency).toBe('GBP');
+	});
+
+	it('accepts a null name', () => {
+		const id = createAccount('Cash', null, 'GBP', db);
+		const account = getAccount(id, db);
+		expect(account!.name).toBeNull();
+	});
+
+	it('returns the new account id', () => {
+		const id = createAccount('Test Bank', 'Current', 'EUR', db);
+		expect(typeof id).toBe('number');
+		expect(id).toBeGreaterThan(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
 // getAccounts — balance
 // ---------------------------------------------------------------------------
 
@@ -535,5 +567,84 @@ describe('getAccount balance', () => {
 		seedTransaction(db, accountId, { amount: '50.00', creditDebit: 'DBIT', status: 'booked' });
 		const account = getAccount(accountId, db);
 		expect(account!.balance).toBe('-50.00');
+	});
+});
+
+// ---------------------------------------------------------------------------
+// getTransactions
+// ---------------------------------------------------------------------------
+
+describe('getTransactions', () => {
+	it('returns all transactions for an account newest first', () => {
+		seedTransaction(db, accountId, { date: '2026-01-01', merchant: 'Old Shop' });
+		seedTransaction(db, accountId, { date: '2026-03-15', merchant: 'New Shop' });
+		const txs = getTransactions(accountId, db);
+		expect(txs).toHaveLength(2);
+		expect(txs[0].merchant).toBe('New Shop');
+		expect(txs[1].merchant).toBe('Old Shop');
+	});
+
+	it('returns empty array when account has no transactions', () => {
+		expect(getTransactions(accountId, db)).toHaveLength(0);
+	});
+
+	it('does not return transactions from other accounts', () => {
+		const otherId = seedAccount(db, { institutionName: 'Other Bank' });
+		seedTransaction(db, otherId);
+		expect(getTransactions(accountId, db)).toHaveLength(0);
+	});
+
+	it('includes all statuses', () => {
+		seedTransaction(db, accountId, { status: 'booked' });
+		seedTransaction(db, accountId, { status: 'pending' });
+		seedTransaction(db, accountId, { status: 'opening_balance' });
+		expect(getTransactions(accountId, db)).toHaveLength(3);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// createTransaction
+// ---------------------------------------------------------------------------
+
+describe('createTransaction', () => {
+	it('creates a DBIT transaction for a negative amount', () => {
+		createTransaction(accountId, '-12.50', 'Weekly shop', '2026-04-01', null, db);
+		const txs = getTransactions(accountId, db);
+		expect(txs).toHaveLength(1);
+		expect(txs[0].credit_debit_indicator).toBe('DBIT');
+		expect(txs[0].amount).toBe('12.50');
+	});
+
+	it('creates a CRDT transaction for a positive amount', () => {
+		createTransaction(accountId, '500.00', 'Salary', '2026-04-01', null, db);
+		const txs = getTransactions(accountId, db);
+		expect(txs[0].credit_debit_indicator).toBe('CRDT');
+		expect(txs[0].amount).toBe('500.00');
+	});
+
+	it('stores description and merchant', () => {
+		createTransaction(accountId, '-5.00', 'Coffee', '2026-04-01', 'Pret', db);
+		const txs = getTransactions(accountId, db);
+		expect(txs[0].description).toBe('Coffee');
+		expect(txs[0].merchant).toBe('Pret');
+	});
+
+	it('defaults date to today when null', () => {
+		const today = new Date().toISOString().slice(0, 10);
+		createTransaction(accountId, '-1.00', 'Test', null, null, db);
+		const txs = getTransactions(accountId, db);
+		expect(txs[0].date).toBe(today);
+	});
+
+	it('sets status to booked and lunchflow_id to null', () => {
+		createTransaction(accountId, '-1.00', 'Test', null, null, db);
+		const txs = getTransactions(accountId, db);
+		expect(txs[0].status).toBe('booked');
+		expect(txs[0].lunchflow_id).toBeNull();
+	});
+
+	it('throws TransactionValidationError for non-numeric amount', () => {
+		expect(() => createTransaction(accountId, 'abc', 'Test', null, null, db))
+			.toThrow(TransactionValidationError);
 	});
 });

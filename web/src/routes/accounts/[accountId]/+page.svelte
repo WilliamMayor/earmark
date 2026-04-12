@@ -3,11 +3,10 @@
 	import { goto } from '$app/navigation';
 	import { formatCurrency, formatDate, formatSignedCurrency } from '$lib/format.js';
 	import { inferGoalType, getRemainingAmount, getEstimatedCompletion } from '$lib/goal-utils.js';
+	import Expander from '$lib/components/Expander.svelte';
 
 	let { data } = $props();
 
-	let showNewEnvelopeForm = $state(false);
-	let newEnvelopeName = $state('');
 	let showAddSplitForm = $state(false);
 	let addSplitAmount = $state('');
 	let addSplitNote = $state('');
@@ -82,58 +81,49 @@
 	class:pb-48={data.mode === 'allocate'}>
 
 	<!-- New envelope form -->
-	{#if showNewEnvelopeForm}
-		<form
-			method="POST"
-			action="?/create_envelope"
-			use:enhance={() => {
-				return async ({ update }) => {
-					await update();
-					showNewEnvelopeForm = false;
-					newEnvelopeName = '';
-				};
-			}}
-			class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm"
-		>
-			<label class="block text-sm font-medium text-gray-700 mb-1" for="new-envelope-name">
-				Envelope name
-			</label>
-			<!-- svelte-ignore a11y_autofocus -->
-			<input
-				id="new-envelope-name"
-				name="name"
-				type="text"
-				bind:value={newEnvelopeName}
-				class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-				placeholder="e.g. Groceries"
-				required
-						autofocus
-			/>
-			<div class="flex gap-2 mt-3">
-				<button
-					type="submit"
-					class="flex-1 bg-blue-600 text-white text-sm font-medium rounded-lg py-2 hover:bg-blue-700"
-				>
-					Create
-				</button>
-				<button
-					type="button"
-					onclick={() => { showNewEnvelopeForm = false; newEnvelopeName = ''; }}
-					class="flex-1 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg py-2 hover:bg-gray-200"
-				>
-					Cancel
-				</button>
-			</div>
-		</form>
-	{:else}
-		<button
-			onclick={() => { showNewEnvelopeForm = true; }}
-			class="w-full bg-white rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
-			data-testid="new-envelope-btn"
-		>
-			+ New envelope
-		</button>
-	{/if}
+	<Expander label="+ New envelope" muted>
+		{#snippet children(close)}
+			<form
+				method="POST"
+				action="?/create_envelope"
+				use:enhance={() => {
+					return async ({ update }) => {
+						await update();
+						close();
+					};
+				}}
+			>
+				<label class="block text-sm font-medium text-gray-700 mb-1" for="new-envelope-name">
+					Envelope name
+				</label>
+				<!-- svelte-ignore a11y_autofocus -->
+				<input
+					id="new-envelope-name"
+					name="name"
+					type="text"
+					class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+					placeholder="e.g. Groceries"
+					required
+					autofocus
+				/>
+				<div class="flex gap-2 mt-3">
+					<button
+						type="submit"
+						class="flex-1 bg-blue-600 text-white text-sm font-medium rounded-lg py-2 hover:bg-blue-700"
+					>
+						Create
+					</button>
+					<button
+						type="button"
+						onclick={close}
+						class="flex-1 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg py-2 hover:bg-gray-200"
+					>
+						Cancel
+					</button>
+				</div>
+			</form>
+		{/snippet}
+	</Expander>
 
 	<!-- Envelope cards -->
 	{#each data.envelopes as envelope (envelope.id)}
