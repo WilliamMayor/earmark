@@ -765,6 +765,11 @@ describe('createWithdrawal', () => {
         const envelopeId = seedEnvelope(db, accountId, 'Savings');
         expect(() => createWithdrawal(envelopeId, '-5.00', null, db)).toThrow(SplitValidationError);
     });
+
+    it('throws SplitValidationError when amount is not a number', () => {
+        const envelopeId = seedEnvelope(db, accountId, 'Savings');
+        expect(() => createWithdrawal(envelopeId, 'abc', null, db)).toThrow(SplitValidationError);
+    });
 });
 
 // ---------------------------------------------------------------------------
@@ -792,6 +797,10 @@ describe('allocateWithdrawal', () => {
 
         allocateWithdrawal(withdrawalId, toId, db);
         expect(() => allocateWithdrawal(withdrawalId, toId, db)).toThrow(WithdrawalAlreadyAllocatedError);
+    });
+
+    it('throws when withdrawal does not exist', () => {
+        expect(() => allocateWithdrawal(9999, 1, db)).toThrow('not found');
     });
 });
 

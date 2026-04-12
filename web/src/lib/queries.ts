@@ -486,64 +486,67 @@ export function allocateSplit(
 // ---------------------------------------------------------------------------
 
 export function createWithdrawal(
-    fromEnvelopeId: number,
-    amount: string,
-    note: string | null,
-    db: Database.Database = getDb()
+	fromEnvelopeId: number,
+	amount: string,
+	note: string | null,
+	db: Database.Database = getDb()
 ): number {
-    const minor = toMinorUnits(amount);
-    if (minor <= 0) {
-        throw new SplitValidationError('Withdrawal amount must be greater than 0');
-    }
-    const result = db
-        .prepare(
-            `INSERT INTO envelope_withdrawals (from_envelope_id, to_envelope_id, amount, note)
-             VALUES (?, NULL, ?, ?)`
-        )
-        .run(fromEnvelopeId, amount, note);
-    return result.lastInsertRowid as number;
+	const value = parseFloat(amount);
+	if (!isFinite(value) || value <= 0) {
+		throw new SplitValidationError('Withdrawal amount must be a positive number');
+	}
+	const result = db
+		.prepare(
+			`INSERT INTO envelope_withdrawals (from_envelope_id, to_envelope_id, amount, note)
+			 VALUES (?, NULL, ?, ?)`
+		)
+		.run(fromEnvelopeId, amount, note);
+	return result.lastInsertRowid as number;
 }
 
 export function allocateWithdrawal(
-    withdrawalId: number,
-    toEnvelopeId: number,
-    db: Database.Database = getDb()
+	withdrawalId: number,
+	toEnvelopeId: number,
+	db: Database.Database = getDb()
 ): void {
-    const existing = db
-        .prepare(`SELECT to_envelope_id FROM envelope_withdrawals WHERE id = ?`)
-        .get(withdrawalId) as { to_envelope_id: number | null } | null;
+	const existing = db
+		.prepare(`SELECT to_envelope_id FROM envelope_withdrawals WHERE id = ?`)
+		.get(withdrawalId) as { to_envelope_id: number | null } | null;
 
-    if (existing?.to_envelope_id !== null && existing?.to_envelope_id !== undefined) {
-        throw new WithdrawalAlreadyAllocatedError(withdrawalId);
-    }
+	if (existing == null) {
+		throw new Error(`Withdrawal ${withdrawalId} not found`);
+	}
+	if (existing.to_envelope_id !== null) {
+		throw new WithdrawalAlreadyAllocatedError(withdrawalId);
+	}
 
-    db.prepare(`UPDATE envelope_withdrawals SET to_envelope_id = ? WHERE id = ?`)
-        .run(toEnvelopeId, withdrawalId);
+	db.prepare(`UPDATE envelope_withdrawals SET to_envelope_id = ? WHERE id = ?`)
+		.run(toEnvelopeId, withdrawalId);
 }
 
 export function getUnallocatedWithdrawals(
-    accountId: number,
-    db: Database.Database = getDb()
+	accountId: number,
+	db: Database.Database = getDb()
 ): EnvelopeWithdrawal[] {
-    return db
-        .prepare(
-            `
-        SELECT
-            w.id,
-            w.from_envelope_id,
-            e.name AS from_envelope_name,
-            w.to_envelope_id,
-            w.amount,
-            w.note,
-            w.created_at
-        FROM envelope_withdrawals w
-        JOIN envelopes e ON e.id = w.from_envelope_id
-        WHERE w.to_envelope_id IS NULL
-          AND e.account_id = ?
-        ORDER BY w.created_at DESC
-        `
-        )
-        .all(accountId) as EnvelopeWithdrawal[];
+	return db
+		.prepare(
+			`
+		SELECT
+			w.id,
+			w.from_envelope_id,
+			e.name AS from_envelope_name,
+			w.to_envelope_id,
+			w.amount,
+			w.note,
+			w.created_at
+		FROM envelope_withdrawals w
+		JOIN envelopes e ON e.id = w.from_envelope_id
+		WHERE w.to_envelope_id IS NULL
+		  AND e.account_id = ?
+		ORDER BY w.created_at DESC
+		`
+		)
+		.all(accountId) as EnvelopeWithdrawal[];
 }
 
 // ---------------------------------------------------------------------------
