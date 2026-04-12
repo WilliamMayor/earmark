@@ -11,7 +11,7 @@ export function createTestDb(): Database.Database {
 	db.pragma('foreign_keys = ON');
 	db.pragma('journal_mode = WAL');
 
-	['0001_initial.sql','0002_envelopes.sql','0003_round_up.sql','0004_envelope_goals.sql','0005_manual_accounts.sql']
+	['0001_initial.sql','0002_envelopes.sql','0003_round_up.sql','0004_envelope_goals.sql','0005_manual_accounts.sql','0006_envelope_withdrawals.sql']
 		.forEach(f => db.exec(readFileSync(join(migrationsDir, f), 'utf8')));
 
 	return db;
@@ -70,5 +70,18 @@ export function seedTransaction(
 
 export function seedEnvelope(db: Database.Database, accountId: number, name = 'Groceries'): number {
 	db.prepare(`INSERT INTO envelopes (account_id, name) VALUES (?, ?)`).run(accountId, name);
+	return (db.prepare(`SELECT last_insert_rowid() AS id`).get() as { id: number }).id;
+}
+
+export function seedWithdrawal(
+	db: Database.Database,
+	fromEnvelopeId: number,
+	opts: { amount?: string; note?: string; toEnvelopeId?: number | null } = {}
+): number {
+	const { amount = '10.00', note = null, toEnvelopeId = null } = opts;
+	db.prepare(
+		`INSERT INTO envelope_withdrawals (from_envelope_id, to_envelope_id, amount, note)
+		 VALUES (?, ?, ?, ?)`
+	).run(fromEnvelopeId, toEnvelopeId, amount, note);
 	return (db.prepare(`SELECT last_insert_rowid() AS id`).get() as { id: number }).id;
 }

@@ -16,6 +16,7 @@ export function initFixtureDb() {
 	db.exec(`
 		DROP TABLE IF EXISTS allocations;
 		DROP TABLE IF EXISTS splits;
+		DROP TABLE IF EXISTS envelope_withdrawals;
 		DROP TABLE IF EXISTS envelopes;
 		DROP TABLE IF EXISTS transactions;
 		DROP TABLE IF EXISTS accounts;
@@ -41,6 +42,7 @@ export function resetFixtureDb() {
 	db.exec(`
 		DELETE FROM allocations;
 		DELETE FROM splits;
+		DELETE FROM envelope_withdrawals;
 		DELETE FROM envelopes;
 		DELETE FROM transactions;
 		DELETE FROM accounts;
