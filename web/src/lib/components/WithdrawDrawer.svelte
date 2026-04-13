@@ -13,9 +13,9 @@
 
 <!-- Drawer body: only rendered when open, sits between card and arrow tab -->
 {#if isOpen}
-    <div class="mx-3 -mt-px border-l border-r border-b border-gray-200 rounded-b-xl bg-white px-4 pt-3 pb-4 space-y-3">
+    <div class="mx-3 mb-0 -mt-px border border-gray-200 rounded-b-xl bg-white px-4 pt-3 pb-4 space-y-3">
         <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            Withdraw from {envelope.name}
+            Withdraw
         </p>
         <form
             method="POST"

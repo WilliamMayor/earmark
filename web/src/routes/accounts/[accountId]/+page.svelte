@@ -148,7 +148,7 @@
 
         <a
             href="/accounts/{account.id}/envelopes/{envelope.id}"
-            class="block bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:border-blue-300 transition-colors"
+            class="block bg-white rounded-xl border border-gray-200 p-4 m-0 shadow-sm hover:border-blue-300 transition-colors"
             data-testid="envelope-card"
         >
             <div class="flex items-start justify-between mb-2">
